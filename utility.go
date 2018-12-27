@@ -156,7 +156,6 @@ func GetProgressAndStatisticsBar()(*ui.Gauge,*ui.BarChart){
 	g.Height = 3
 	g.X = 5
 	g.Y = 3
-	test build failure
 	g.BorderLabel = "Download Progress"
 	g.BarColor = ui.ColorRed
 	g.BorderFg = ui.ColorWhite
