@@ -181,7 +181,7 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 		for k, v := range config.Filters {
 			_, ok := customFieldMap[strings.ToLower(k)]
 			if ok {
-				equivalentFieldId := customFieldMap[k]
+				equivalentFieldId := customFieldMap[strings.ToLower(k)]
 				keyName := "cf[" + strings.Replace(equivalentFieldId, "customfield_", "", -1) + "]"
 				substitutedFilters[keyName] = v.(string)
 			} else {
@@ -192,10 +192,10 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 		for _, v := range config.FieldsToRetrieve {
 			_, ok = customFieldMap[strings.ToLower(v)]
 			if ok {
-				equivalentFieldId := customFieldMap[v]
+				equivalentFieldId := customFieldMap[strings.ToLower(v)]
 				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, fmt.Sprint(equivalentFieldId))
 			} else {
-				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, v)
+				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, strings.ToLower(v))
 			}
 		}
 	}

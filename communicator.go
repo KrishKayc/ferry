@@ -215,19 +215,19 @@ func GetValue(val interface{}, fieldName string) string {
 
 // GetNestedMapKeyName gets the nested field name to search for a parent name
 func GetNestedMapKeyName(fieldName string) string {
-	if fieldName == "assignee" {
+	if strings.ToLower(fieldName) == "assignee" {
 		return "displayName"
 	}
 
-	if fieldName == "issuetype" {
+	if strings.ToLower(fieldName) == "issuetype" {
 		return "name"
 	}
 
-	if fieldName == "timetracking" {
+	if strings.ToLower(fieldName) == "timetracking" {
 		return "originalEstimate"
 	}
 
-	if fieldName == "status" {
+	if strings.ToLower(fieldName) == "status" {
 		return "name"
 	}
 
