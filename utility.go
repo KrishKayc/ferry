@@ -79,9 +79,9 @@ func GetFieldValue(field string, issue JiraIssue)string{
 	   return fmt.Sprint(GetNumberOfFunctionalBugs(issue.SubTasks))
 	 }else if(field == "complexity"){
 	   return GetComplexityBasedOnDevEstimation(issue.SubTasks)
-	 }else{
-	   return GetValueFromField(issue.Data, field)
-	 } 
+	 }
+	 
+	 return GetValueFromField(issue.Data, field)
 }
 
 
