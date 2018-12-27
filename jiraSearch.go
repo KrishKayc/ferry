@@ -179,7 +179,7 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 
 	if ok {
 		for k, v := range config.Filters {
-			_, ok := customFieldMap[k]
+			_, ok := customFieldMap[strings.ToLower(k)]
 			if ok {
 				equivalentFieldId := customFieldMap[k]
 				keyName := "cf[" + strings.Replace(equivalentFieldId, "customfield_", "", -1) + "]"
@@ -190,7 +190,7 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 		}
 
 		for _, v := range config.FieldsToRetrieve {
-			_, ok = customFieldMap[v]
+			_, ok = customFieldMap[strings.ToLower(v)]
 			if ok {
 				equivalentFieldId := customFieldMap[v]
 				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, fmt.Sprint(equivalentFieldId))

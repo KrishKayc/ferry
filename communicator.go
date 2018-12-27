@@ -32,6 +32,7 @@ func CreateRequest(jiraUrl string, apiPath string, authToken string, params map[
 		finalPath = jiraUrl + apiPath
 	}
 
+
 	req, err := http.NewRequest("GET", finalPath, nil)
 	req.Header.Add("Authorization", bearer)
 	HandleError(err)
@@ -226,5 +227,9 @@ func GetNestedMapKeyName(fieldName string) string {
 		return "originalEstimate"
 	}
 
-	return ""
+	if fieldName == "status" {
+		return "name"
+	}
+
+	return "value"
 }
