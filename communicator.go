@@ -9,6 +9,8 @@ import (
 	"net/url"
 )
 
+
+// Creates http request for the jiraUrl from config and path passed
 func CreateRequest(jiraUrl string, apiPath string, authToken string, params []string)*http.Request{
 	var finalPath string
 	bearer := "Basic " + authToken
@@ -42,6 +44,7 @@ func CreateRequest(jiraUrl string, apiPath string, authToken string, params []st
 }
 
 
+// Creates http request for the jiraUrl from config and path passed and gets the response body
 func CreateRequestAndGetResponse(jiraUrl string, apiPath string, authToken string, params []string)[]byte{
 	
 	req := CreateRequest(jiraUrl, apiPath,authToken, params)
@@ -57,6 +60,7 @@ func CreateRequestAndGetResponse(jiraUrl string, apiPath string, authToken strin
 }
 
 
+// Gets all the custom fields for the jiraUrl mentioned in the config
 func GetCustomFields(config Configuration, customFieldChannel chan map[string]string){
 	
 	body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/field", config.AuthToken, nil)
@@ -84,6 +88,7 @@ func GetCustomFields(config Configuration, customFieldChannel chan map[string]st
 }
 
 
+// Searches issues based on the jql passed
 func SearchIssues(config Configuration, jql string, processedFields []string,issueRetrievedChannel chan JiraIssue){
 
 	params := make([]string,0)
@@ -105,6 +110,7 @@ func SearchIssues(config Configuration, jql string, processedFields []string,iss
 }
 
 
+// Get Issue based from the jiraUrl in the config and issueId passed
 func GetIssue(config Configuration, issueId string, includeChangeLog bool)map[string]interface{}{
 
 	var getIssueUrl string
@@ -126,6 +132,7 @@ func GetIssue(config Configuration, issueId string, includeChangeLog bool)map[st
 }
 
 
+// Get All Sub Tasks for the passed issue
 func GetSubTasksForIssue(config Configuration, issue JiraIssue, finalIssueChannel chan JiraIssue, includeChangeLog bool, totalRestCalls *int){
 	
 	issueId := issue.Data["id"].(string)
@@ -158,6 +165,7 @@ func GetSubTasksForIssue(config Configuration, issue JiraIssue, finalIssueChanne
 }
 
 
+// Gets Developer Name From the work log record where status was 'In Development' stage
 func GetDeveloperNameFromLog(issue map[string]interface{})string{
 	developerName := ""
 	histories := issue["changelog"].(map[string]interface{})["histories"].([]interface{})
@@ -182,6 +190,7 @@ func GetDeveloperNameFromLog(issue map[string]interface{})string{
 }
 
 
+// Gets the value from the 'fields' property of the issue
 func GetValueFromField(issue map[string]interface{}, field string)string{
 	val, ok:= issue["fields"]
 	if(ok){
@@ -197,6 +206,7 @@ func GetValueFromField(issue map[string]interface{}, field string)string{
 
 
 
+// Gets the value based on the type of interface
 func GetValue(val interface{}, fieldName string)string{
 	var result string
 	arrayVal, isArray := val.([]interface{})
@@ -216,6 +226,7 @@ func GetValue(val interface{}, fieldName string)string{
 }
 
 
+// Gets the nested field name to search for a parent name
 func GetNestedMapKeyName(fieldName string)string{
 	if(fieldName == "assignee"){
 		return "displayName"

@@ -12,6 +12,7 @@ import(
 	 ui "github.com/gizak/termui"
 )
 
+// HandleError panics when there is an error in the App
 func HandleError(err error){
      if(err != nil){
 		panic(err.Error())
@@ -19,11 +20,13 @@ func HandleError(err error){
 }
 
 
+// Encodes the value to a Base64 string
 func EncodeStringToBase64(val string)string{
 	return base64.StdEncoding.EncodeToString([]byte(val))
 }
 
 
+// Reads value from configuration file and return struct
 func ReadConfigFromFile(fileName string)Configuration{
 	var config Configuration
 	fmt.Println("Fetching data based on the configuration file => "+ fileName)
@@ -41,6 +44,7 @@ func ReadConfigFromFile(fileName string)Configuration{
 }
 
 
+// Writes the results to the path specified as csv
 func WriteToCsv(results [][]string, path string){
 
 	if(len(results) > 0){
@@ -64,6 +68,7 @@ func WriteToCsv(results [][]string, path string){
 }
 
 
+// Gets the field value based on the field name
 func GetFieldValue(field string, issue JiraIssue)string{
 	if(field == "assignee"){
 		if(issue.AssigneeName != ""){
@@ -80,6 +85,7 @@ func GetFieldValue(field string, issue JiraIssue)string{
 }
 
 
+// Gets Assignee name of the dev task, exclude code review task
 func GetDevTaskAssigneeName(subTasks []SubTask)string{
 	for _,subTask := range subTasks{
 		if(strings.Contains(subTask.Name,"Dev") && !strings.Contains(subTask.Name, "code review")){
@@ -91,6 +97,7 @@ func GetDevTaskAssigneeName(subTasks []SubTask)string{
 }
 
 
+// Gets the total number of functional issues in the sub tasks
 func GetNumberOfFunctionalBugs(subTasks []SubTask)int{
   numberOfFunctionalBugs := 0
   for _,subTask := range subTasks{
@@ -102,6 +109,7 @@ func GetNumberOfFunctionalBugs(subTasks []SubTask)int{
 }
 
 
+// Gets the complexity based on dev estimation
 func GetComplexityBasedOnDevEstimation(subTasks []SubTask)string{
   totalHours := 0
   for _,subTask := range subTasks{

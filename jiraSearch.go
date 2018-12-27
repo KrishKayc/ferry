@@ -8,10 +8,13 @@ import(
 	 ui "github.com/gizak/termui"
 )
 
+// ProcessedData represents the filters and fields after replacing custom field ids
 type ProcessedData struct{
 	filters map[string]string
 	fields []string
 }
+
+// Represents the configuration file 'config.json'
 type Configuration struct{
 	JiraUrl string
 	Credentials Credentials
@@ -20,11 +23,14 @@ type Configuration struct{
 	DownloadPath string
 	AuthToken string
 }
+
+// Credentials of the user
 type Credentials struct{
 	Username string
 	Password string
 }
 
+// SubTask of a Jira Issue
 type SubTask struct{
 	Type string
 	AssigneeName string
@@ -32,6 +38,7 @@ type SubTask struct{
 	Name string
 }
 
+// Represents an issue in Jira
 type JiraIssue struct{
 	Data map[string]interface{}
 	SubTasks []SubTask
