@@ -14,7 +14,7 @@ type ProcessedData struct{
 	fields []string
 }
 
-// Represents the configuration file 'config.json'
+// Configuration represents the configuration file 'config.json'
 type Configuration struct{
 	JiraUrl string
 	Credentials Credentials
@@ -38,7 +38,7 @@ type SubTask struct{
 	Name string
 }
 
-// Represents an issue in Jira
+// JiraIssue represents an issue in Jira
 type JiraIssue struct{
 	Data map[string]interface{}
 	SubTasks []SubTask
@@ -158,7 +158,7 @@ func GetJql(filters map[string]string)string{
 }
 
 
-// Constructs the 'In' Clause value
+// GetInFilterValue constructs the 'In' Clause value
 func GetInFilterValue(values []string)string{
 	index := 0
 	totalCount := len(values)
@@ -210,6 +210,7 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 }
 
 
+// InitiateSearch initiates the search process
 func InitiateSearch(config Configuration, customFieldProcessorChannel chan ProcessedData, issueRetrievedChannel chan JiraIssue, totalRestCalls *int){
 		processedValues, ok := <- customFieldProcessorChannel
 		if(ok){
