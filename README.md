@@ -6,9 +6,9 @@ Utility to Search and download Issues From Jira with a configurable Filter
 **Output**:
 Download InProgress:
 
-![Output](https://github.com/KrishKayc/jirasearch/blob/master/jirasearch_output.jpg?raw=true)
+![Output](https://github.com/KrishKayc/jirasearch/blob/master/output_screenshots/jirasearch_output.jpg?raw=true)
 
 Download Complete:
 
-![FinalOutput](https://github.com/KrishKayc/jirasearch/blob/master/jirasearch_finaloutput.jpg?raw=true)
+![FinalOutput](https://github.com/KrishKayc/jirasearch/blob/master/output_screenshots/jirasearch_finaloutput.jpg?raw=true)
 
