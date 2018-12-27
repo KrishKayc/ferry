@@ -11,7 +11,7 @@ func TestGetNumberOfFunctionalBugs(t *testing.T){
 
 	numberOfFunctionalBugs := GetNumberOfFunctionalBugs(subTasks)
 
-	if(numberOfFunctionalBugs != 1){
+	if(numberOfFunctionalBugs != 2){
 		t.Errorf("The number of funcational bugs is incorrect, got : %d, want : %d",numberOfFunctionalBugs,1)
 	}
 }
