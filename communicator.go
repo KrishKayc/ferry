@@ -10,7 +10,7 @@ import (
 )
 
 // CreateRequest creates http request for the jiraUrl from config and path passed
-func CreateRequest(jiraUrl string, apiPath string, authToken string, params []string) *http.Request {
+func CreateRequest(jiraUrl string, apiPath string, authToken string, params map[string]string) *http.Request {
 	var finalPath string
 	bearer := "Basic " + authToken
 	if params != nil {
@@ -21,9 +21,8 @@ func CreateRequest(jiraUrl string, apiPath string, authToken string, params []st
 		endPoint.Path += apiPath
 		parameters := url.Values{}
 
-		for _, param := range params {
-			parameters.Add("jql", param)
-			parameters.Add("fields", param)
+		for k, v := range params {
+			parameters.Add(k, v)
 		}
 
 		endPoint.RawQuery = parameters.Encode()
@@ -42,7 +41,7 @@ func CreateRequest(jiraUrl string, apiPath string, authToken string, params []st
 }
 
 // CreateRequestAndGetResponse creates http request for the jiraUrl from config and path passed and gets the response body
-func CreateRequestAndGetResponse(jiraUrl string, apiPath string, authToken string, params []string) []byte {
+func CreateRequestAndGetResponse(jiraUrl string, apiPath string, authToken string, params map[string]string) []byte {
 
 	req := CreateRequest(jiraUrl, apiPath, authToken, params)
 	client := &http.Client{}
@@ -86,9 +85,10 @@ func GetCustomFields(config Configuration, customFieldChannel chan map[string]st
 // SearchIssues finds issues based on the jql passed
 func SearchIssues(config Configuration, jql string, processedFields []string, issueRetrievedChannel chan JiraIssue) {
 
-	params := make([]string, 0)
-	params = append(params, jql)
-	params = append(params, strings.Join(processedFields, ","))
+	params := make(map[string]string, 0)
+	params["jql"] = jql
+	params["fields"] = strings.Join(processedFields, ",")
+	params["maxResults"] = "1000"
 
 	body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/search", config.AuthToken, params)
 	var responseResult map[string]interface{}
