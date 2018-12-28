@@ -91,7 +91,7 @@ func main() {
 				totalIssueCount++
 				issueCount++
 				DisplayProgressAndStatistics(totalIssueCount, -1, totalRestCalls, int(time.Since(start).Seconds()), g, bc)
-				includeChangeLog := strings.Contains(config.Filters["IssueType"].(string), "Bug")
+				includeChangeLog := strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "bug") || strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "issue")
 
 				// listen to issue retrieved channel and assign the sub tasks for it
 				go GetSubTasksForIssue(config, issue, finalIssueChannel, includeChangeLog, &totalRestCalls)

@@ -148,12 +148,17 @@ func GetSubTasksForIssue(config Configuration, issue JiraIssue, finalIssueChanne
 	issue.SubTasks = result
 
 	parentIssueType := GetValueFromField(parent, "issuetype")
-	if parentIssueType == "Bug" || parentIssueType == "Functional Bug" {
+	if IsBug(parentIssueType) {
 		issue.AssigneeName = GetDeveloperNameFromLog(parent)
 	}
 
 	finalIssueChannel <- issue
 
+}
+
+// IsBug determines whether the issue type is a bug
+func IsBug(issueType string) bool {
+	return strings.ToLower(issueType) == "bug" || strings.ToLower(issueType) == "functional bug" || strings.ToLower(issueType) == "production issue"
 }
 
 // GetDeveloperNameFromLog gets Developer Name From the work log record where status was 'In Development' stage
