@@ -68,16 +68,17 @@ func main() {
 
 	// Read config from the 'config.json' file
 	config := ReadConfig("config.json")
+	communicator := JiraCommunicator{Url: config.JiraUrl, AuthToken: config.AuthToken}
 
 	// get all the custom fields first and populate in customFieldChannel
 	totalRestCalls++
-	go GetCustomFields(config, customFieldChannel)
+	go GetCustomFields(config, customFieldChannel, &communicator)
 
 	// listen to custom fields channel and process the data
 	go ProcessCustomFields(config, customFieldChannel, customFieldProcessorChannel)
 
 	// listen to processed data and intiate the search based on it
-	go InitiateSearch(config, customFieldProcessorChannel, issueRetrievedChannel, &totalRestCalls)
+	go InitiateSearch(config, customFieldProcessorChannel, issueRetrievedChannel, &totalRestCalls, &communicator)
 
 	//prepare output with the headers first
 	headers := config.FieldsToRetrieve
@@ -94,7 +95,7 @@ func main() {
 				includeChangeLog := strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "bug") || strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "issue")
 
 				// listen to issue retrieved channel and assign the sub tasks for it
-				go GetSubTasksForIssue(config, issue, finalIssueChannel, includeChangeLog, &totalRestCalls)
+				go GetSubTasksForIssue(config, issue, finalIssueChannel, includeChangeLog, &totalRestCalls, &communicator)
 			}
 
 		case finalIssue := <-finalIssueChannel:
@@ -204,10 +205,10 @@ func ProcessCustomFields(config Configuration, customFieldChannel chan map[strin
 }
 
 // InitiateSearch initiates the search process
-func InitiateSearch(config Configuration, customFieldProcessorChannel chan ProcessedData, issueRetrievedChannel chan JiraIssue, totalRestCalls *int) {
+func InitiateSearch(config Configuration, customFieldProcessorChannel chan ProcessedData, issueRetrievedChannel chan JiraIssue, totalRestCalls *int, communicator Communicator) {
 	processedValues, ok := <-customFieldProcessorChannel
 	if ok {
 		*totalRestCalls++
-		go SearchIssues(config, GetJql(processedValues.filters), processedValues.fields, issueRetrievedChannel)
+		go SearchIssues(config, GetJql(processedValues.filters), processedValues.fields, issueRetrievedChannel, communicator)
 	}
 }

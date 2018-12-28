@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+// Communicator represents REST calls over network
+type Communicator interface {
+	// CreateRequestAndGetResponse creates http request and gives back the response body
+	CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte
+}
+
+// JiraCommunicator represent API calls to Jira
+type JiraCommunicator struct {
+	Url       string
+	AuthToken string
+}
+
+// CreateRequestAndGetResponse creates JIRA request and gives back the response body
+func (jc *JiraCommunicator) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
+	req := CreateRequest(jc.Url, apiPath, jc.AuthToken, params)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	HandleError(err)
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	HandleError(err)
+
+	return body
+}
+
 // CreateRequest creates http request for the jiraUrl from config and path passed
 func CreateRequest(jiraUrl string, apiPath string, authToken string, params map[string]string) *http.Request {
 	var finalPath string
@@ -57,9 +83,10 @@ func CreateRequestAndGetResponse(jiraUrl string, apiPath string, authToken strin
 }
 
 // GetCustomFields gets all the custom fields for the jiraUrl mentioned in the config
-func GetCustomFields(config Configuration, customFieldChannel chan map[string]string) {
+func GetCustomFields(config Configuration, customFieldChannel chan map[string]string, communicator Communicator) {
 
-	body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/field", config.AuthToken, nil)
+	body := communicator.CreateRequestAndGetResponse("/rest/api/2/field", nil)
+	//body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/field", config.AuthToken, nil)
 	var fields []map[string]interface{}
 	json.Unmarshal([]byte(body), &fields)
 
@@ -84,14 +111,15 @@ func GetCustomFields(config Configuration, customFieldChannel chan map[string]st
 }
 
 // SearchIssues finds issues based on the jql passed
-func SearchIssues(config Configuration, jql string, processedFields []string, issueRetrievedChannel chan JiraIssue) {
+func SearchIssues(config Configuration, jql string, processedFields []string, issueRetrievedChannel chan JiraIssue, communicator Communicator) {
 
 	params := make(map[string]string, 0)
 	params["jql"] = jql
 	params["fields"] = strings.Join(processedFields, ",")
 	params["maxResults"] = "1000"
 
-	body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/search", config.AuthToken, params)
+	body := communicator.CreateRequestAndGetResponse("/rest/api/2/search", params)
+	//body := CreateRequestAndGetResponse(config.JiraUrl, "/rest/api/2/search", config.AuthToken, params)
 	var responseResult map[string]interface{}
 	var issues []interface{}
 	json.Unmarshal([]byte(body), &responseResult)
@@ -106,7 +134,7 @@ func SearchIssues(config Configuration, jql string, processedFields []string, is
 }
 
 // GetIssue fetches Issue based from the jiraUrl in the config and issueId passed
-func GetIssue(config Configuration, issueId string, includeChangeLog bool) map[string]interface{} {
+func GetIssue(config Configuration, issueId string, includeChangeLog bool, communicator Communicator) map[string]interface{} {
 
 	var getIssueUrl string
 
@@ -116,7 +144,8 @@ func GetIssue(config Configuration, issueId string, includeChangeLog bool) map[s
 		getIssueUrl = "/rest/api/2/issue/" + issueId
 	}
 
-	body := CreateRequestAndGetResponse(config.JiraUrl, getIssueUrl, config.AuthToken, nil)
+	body := communicator.CreateRequestAndGetResponse(getIssueUrl, nil)
+	//body := CreateRequestAndGetResponse(config.JiraUrl, getIssueUrl, config.AuthToken, nil)
 
 	var responseResult map[string]interface{}
 	json.Unmarshal([]byte(body), &responseResult)
@@ -125,17 +154,17 @@ func GetIssue(config Configuration, issueId string, includeChangeLog bool) map[s
 }
 
 // GetSubTasksForIssue gets All Sub Tasks for the passed issue
-func GetSubTasksForIssue(config Configuration, issue JiraIssue, finalIssueChannel chan JiraIssue, includeChangeLog bool, totalRestCalls *int) {
+func GetSubTasksForIssue(config Configuration, issue JiraIssue, finalIssueChannel chan JiraIssue, includeChangeLog bool, totalRestCalls *int, communicator Communicator) {
 
 	issueId := issue.Data["id"].(string)
 	*totalRestCalls++
-	parent := GetIssue(config, issueId, includeChangeLog)
+	parent := GetIssue(config, issueId, includeChangeLog, communicator)
 	subTasks := parent["fields"].(map[string]interface{})["subtasks"].([]interface{})
 	result := make([]SubTask, 0)
 
 	for _, subTask := range subTasks {
 		*totalRestCalls++
-		subTaskIssue := GetIssue(config, subTask.(map[string]interface{})["id"].(string), false)
+		subTaskIssue := GetIssue(config, subTask.(map[string]interface{})["id"].(string), false, communicator)
 		assignee := GetValueFromField(subTaskIssue, "assignee")
 		issueType := GetValueFromField(subTaskIssue, "issuetype")
 		name := GetValueFromField(subTaskIssue, "summary")

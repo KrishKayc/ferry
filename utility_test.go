@@ -4,6 +4,17 @@ import (
 	"testing"
 )
 
+type MockCommunicator struct {
+	Url       string
+	AuthToken string
+}
+
+func (mc *MockCommunicator) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
+	var jsonString = "{\"fields\" : { \"subTasks\" : [] }}"
+	b := []byte(jsonString)
+	return b
+}
+
 func TestGetNumberOfFunctionalBugs(t *testing.T) {
 	subTasks := make([]SubTask, 0)
 	subTask1 := SubTask{Type: "Functional Bug"}
@@ -188,6 +199,14 @@ func TestGetNestedMapKeyName(t *testing.T) {
 	}
 }
 
+func TestGetIssue(t *testing.T) {
+	mc := MockCommunicator{}
+	issue := GetIssue(Configuration{}, "", false, &mc)
+
+	if issue["fields"] == nil {
+		t.Errorf("Get Issue not returning map")
+	}
+}
 func ThrowError(t *testing.T, errorMsg string, expected string, actual string) {
 	t.Errorf("%s, got : %s, want: %s", errorMsg, actual, expected)
 }
