@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // CreateRequest creates http request for the jiraUrl from config and path passed
@@ -188,6 +189,10 @@ func GetValueFromField(issue map[string]interface{}, field string) string {
 
 		val, ok := fieldsMap[field]
 		if ok {
+			if strings.ToLower(field) == "created" {
+				dateVal, _ := time.Parse("2006-01-02T15:04:05.999-0700", val.(string))
+				return dateVal.Format("02/Jan/06")
+			}
 			return strings.Replace(GetValue(val, field), ",", "", -1)
 		}
 	}
