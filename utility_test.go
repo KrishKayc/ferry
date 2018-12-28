@@ -1,6 +1,8 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGetNumberOfFunctionalBugs(t *testing.T) {
 	subTasks := make([]SubTask, 0)
@@ -138,4 +140,54 @@ func TestGetFieldValueFromField(t *testing.T) {
 	if fieldValue != "5" {
 		t.Errorf("Wrong field value. got : %s, want : %s", fieldValue, "5")
 	}
+}
+
+func TestReadConfig(t *testing.T) {
+	config := ReadConfig("config.json")
+
+	if config.JiraUrl != "https://your-jira-url.com" {
+		t.Errorf("Wrong config jiraUrl, got : %s, want: %s", config.JiraUrl, "https://your-jira-url.com")
+	}
+}
+
+func TestGetNestedMapKeyName(t *testing.T) {
+	result := GetNestedMapKeyName("Assignee")
+
+	if result != "displayName" {
+		ThrowError(t, "worng assignee nested name", "displayName", result)
+	}
+
+	result = GetNestedMapKeyName("Reporter")
+
+	if result != "displayName" {
+		ThrowError(t, "worng reporter nested name", "displayName", result)
+	}
+
+	result = GetNestedMapKeyName("IssueType")
+
+	if result != "name" {
+		ThrowError(t, "worng IssueType nested name", "name", result)
+	}
+
+	result = GetNestedMapKeyName("TimeTracking")
+
+	if result != "originalEstimate" {
+		ThrowError(t, "worng TimeTracking nested name", "originalEstimate", result)
+	}
+
+	result = GetNestedMapKeyName("Status")
+
+	if result != "name" {
+		ThrowError(t, "worng Status nested name", "name", result)
+	}
+
+	result = GetNestedMapKeyName("someCustomField")
+
+	if result != "value" {
+		ThrowError(t, "worng custom field value name", "value", result)
+	}
+}
+
+func ThrowError(t *testing.T, errorMsg string, expected string, actual string) {
+	t.Errorf("%s, got : %s, want: %s", errorMsg, actual, expected)
 }

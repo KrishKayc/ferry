@@ -24,8 +24,8 @@ func EncodeStringToBase64(val string) string {
 	return base64.StdEncoding.EncodeToString([]byte(val))
 }
 
-// ReadConfigFromFile reads value from configuration file and return struct
-func ReadConfigFromFile(fileName string) Configuration {
+// ReadConfig reads value from configuration file and return struct
+func ReadConfig(fileName string) Configuration {
 	var config Configuration
 	fmt.Println("Fetching data based on the configuration file => " + fileName)
 	jsonFile, err := os.Open(fileName)
@@ -75,7 +75,7 @@ func GetFieldValue(field string, issue JiraIssue) string {
 		return fmt.Sprint(GetNumberOfFunctionalBugs(issue.SubTasks))
 	} else if field == "complexity" {
 		return GetComplexityBasedOnDevEstimation(issue.SubTasks)
-	}
+	} 
 
 	return GetValueFromField(issue.Data, field)
 }

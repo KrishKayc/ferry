@@ -67,7 +67,7 @@ func main() {
 	g, bc := GetProgressAndStatisticsBar()
 
 	// Read config from the 'config.json' file
-	config := ReadConfigFromFile("config.json")
+	config := ReadConfig("config.json")
 
 	// get all the custom fields first and populate in customFieldChannel
 	totalRestCalls++
