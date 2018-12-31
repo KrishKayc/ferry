@@ -10,7 +10,7 @@ type MockCommunicator struct {
 }
 
 func (mc *MockCommunicator) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
-	var jsonString = "{\"fields\" : { \"subTasks\" : [] }}"
+	var jsonString = "{\"fields\" : { \"subTasks\" : [ {} ], \"issuetype\": { \"name\" : \"story\" } }}"
 	b := []byte(jsonString)
 	return b
 }
@@ -207,6 +207,16 @@ func TestGetIssue(t *testing.T) {
 		t.Errorf("Get Issue not returning map")
 	}
 }
+
+func TestGetIssueIncludingLog(t *testing.T) {
+	mc := MockCommunicator{}
+	issue := GetIssue(Configuration{}, "", true, &mc)
+
+	if issue["fields"] == nil {
+		t.Errorf("Get Issue not returning map")
+	}
+}
+
 func ThrowError(t *testing.T, errorMsg string, expected string, actual string) {
 	t.Errorf("%s, got : %s, want: %s", errorMsg, actual, expected)
 }
