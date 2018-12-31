@@ -92,17 +92,23 @@ func GetCustomFields(config Configuration, customFieldChannel chan map[string]st
 
 	var result map[string]string
 	result = make(map[string]string)
+	staticFields := make(map[string]string, 0)
 
 	for _, field := range fields {
 		if field["custom"].(bool) {
 			_, ok := result[field["name"].(string)]
 			if !ok {
-				result[strings.ToLower(field["name"].(string))] = strings.ToLower(field["id"].(string))
+				_, isStaticField := staticFields[strings.ToLower(field["name"].(string))]
+				if !isStaticField {
+					result[strings.ToLower(field["name"].(string))] = strings.ToLower(field["id"].(string))
+				}
 			}
 		} else {
 			_, ok := result[strings.ToLower(field["name"].(string))]
 			if ok {
 				delete(result, strings.ToLower(field["name"].(string)))
+			} else {
+				staticFields[strings.ToLower(field["name"].(string))] = strings.ToLower(field["id"].(string))
 			}
 		}
 	}
@@ -257,7 +263,7 @@ func GetNestedMapKeyName(fieldName string) string {
 		return "displayName"
 	}
 
-	if strings.ToLower(fieldName) == "issuetype" || strings.ToLower(fieldName) == "status" {
+	if strings.ToLower(fieldName) == "issuetype" || strings.ToLower(fieldName) == "status" || strings.ToLower(fieldName) == "priority" {
 		return "name"
 	}
 
