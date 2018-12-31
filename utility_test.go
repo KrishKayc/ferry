@@ -14,6 +14,11 @@ type MockCommunicatorFieldRetrieval struct {
 	AuthToken string
 }
 
+type MockCommunicatorFieldRetrievalStaticFields struct {
+	Url       string
+	AuthToken string
+}
+
 func (mc *MockCommunicator) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
 	var jsonString = "{\"fields\" : { \"subTasks\" : [ {} ], \"issuetype\": { \"name\" : \"story\" } }}"
 	b := []byte(jsonString)
@@ -22,6 +27,12 @@ func (mc *MockCommunicator) CreateRequestAndGetResponse(apiPath string, params m
 
 func (mc *MockCommunicatorFieldRetrieval) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
 	var jsonString = "[{\"custom\" : true, \"name\" : \"testName\", \"id\" : \"testId\" }]"
+	b := []byte(jsonString)
+	return b
+}
+
+func (mc *MockCommunicatorFieldRetrievalStaticFields) CreateRequestAndGetResponse(apiPath string, params map[string]string) []byte {
+	var jsonString = "[{\"custom\" : true, \"name\" : \"testName\", \"id\" : \"testId\" }, {\"custom\" : false, \"name\" : \"testName\", \"id\" : \"testId\"}]"
 	b := []byte(jsonString)
 	return b
 }
@@ -237,6 +248,19 @@ func TestGetCustomFields(t *testing.T) {
 	customFieldMap := <-customFieldChannel
 
 	if customFieldMap["testname"] != "testid" {
+		t.Errorf("Failed retieving custom field values into a map")
+	}
+}
+
+func TestGetCustomFieldsStaticFields(t *testing.T) {
+	customFieldChannel := make(chan map[string]string)
+	mc := MockCommunicatorFieldRetrievalStaticFields{}
+
+	go GetCustomFields(Configuration{}, customFieldChannel, &mc)
+
+	customFieldMap := <-customFieldChannel
+
+	if len(customFieldMap) != 0 {
 		t.Errorf("Failed retieving custom field values into a map")
 	}
 }
