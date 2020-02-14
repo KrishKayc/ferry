@@ -13,9 +13,9 @@ Utility to Search and download Issues From JIRA with a configurable Filters and 
 # Output:
 **Download InProgress**:
 
-![Output](https://github.com/KrishKayc/jirasearch/blob/master/output_screenshots/jirasearch_output.jpg?raw=true)
+![Output](https://github.com/KrishKayc/goJIRA/blob/master/output_screenshots/jiraSearch_finaloutput1.jpg)
 
 **Download Complete**:
 
-![FinalOutput](https://github.com/KrishKayc/jirasearch/blob/master/output_screenshots/jirasearch_finaloutput.jpg?raw=true)
+![FinalOutput](https://github.com/KrishKayc/goJIRA/blob/master/output_screenshots/jiraSearch_finaloutput2.jpg)
 
