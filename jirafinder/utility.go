@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/fatih/color"
 )
 
 func writeToCsv(results [][]string, path string) {
@@ -73,19 +71,19 @@ func getInFilterValue(values []string) string {
 }
 
 // GetFieldValue gets the field value based on the field name
-func getFieldValue(field string, issue JiraIssue) string {
+func getFieldValue(field string, issue jiraIssue) string {
 	if field == "assignee" {
-		if issue.AssigneeName != "" {
-			return issue.AssigneeName
+		if issue.assigneeName != "" {
+			return issue.assigneeName
 		}
-		return getDevTaskAssigneeName(issue.SubTasks)
+		return getDevTaskAssigneeName(issue.subTasks)
 	} else if field == "bug count" {
-		return fmt.Sprint(getNumberOfFunctionalBugs(issue.SubTasks))
+		return fmt.Sprint(getNumberOfFunctionalBugs(issue.subTasks))
 	} else if field == "complexity" {
-		return getComplexityBasedOnDevEstimation(issue.SubTasks)
+		return getComplexityBasedOnDevEstimation(issue.subTasks)
 	}
 
-	return getValueFromField(issue.Data, field)
+	return getValueFromField(issue.data, field)
 }
 
 // GetValueFromField gets the value from the 'fields' property of the issue
@@ -143,10 +141,10 @@ func getNestedMapKeyName(fieldName string) string {
 }
 
 // GetDevTaskAssigneeName gets Assignee name of the dev task, exclude code review task
-func getDevTaskAssigneeName(subTasks []SubTask) string {
+func getDevTaskAssigneeName(subTasks []subTask) string {
 	for _, subTask := range subTasks {
-		if strings.Contains(subTask.Name, "Dev") && !strings.Contains(subTask.Name, "code review") {
-			return subTask.AssigneeName
+		if strings.Contains(subTask.name, "Dev") && !strings.Contains(subTask.name, "code review") {
+			return subTask.assigneeName
 		}
 	}
 
@@ -154,10 +152,10 @@ func getDevTaskAssigneeName(subTasks []SubTask) string {
 }
 
 // GetNumberOfFunctionalBugs gets the total number of functional issues in the sub tasks
-func getNumberOfFunctionalBugs(subTasks []SubTask) int {
+func getNumberOfFunctionalBugs(subTasks []subTask) int {
 	numberOfFunctionalBugs := 0
 	for _, subTask := range subTasks {
-		if subTask.Type == "Functional Bug" {
+		if subTask.taskType == "Functional Bug" {
 			numberOfFunctionalBugs++
 		}
 	}
@@ -165,11 +163,11 @@ func getNumberOfFunctionalBugs(subTasks []SubTask) int {
 }
 
 // GetComplexityBasedOnDevEstimation gets the complexity based on dev estimation
-func getComplexityBasedOnDevEstimation(subTasks []SubTask) string {
+func getComplexityBasedOnDevEstimation(subTasks []subTask) string {
 	totalHours := 0
 	for _, subTask := range subTasks {
-		if strings.Contains(subTask.Name, "Dev") && !strings.Contains(subTask.Name, "code review") {
-			hours, _ := strconv.Atoi(strings.TrimRight(subTask.TotalHours, "h"))
+		if strings.Contains(subTask.name, "Dev") && !strings.Contains(subTask.name, "code review") {
+			hours, _ := strconv.Atoi(strings.TrimRight(subTask.totalHours, "h"))
 			totalHours += hours
 		}
 	}
@@ -193,6 +191,9 @@ func isBug(issueType string) bool {
 }
 
 func getDeveloperNameFromLog(issue map[string]interface{}) string {
+	if issue == nil {
+		return ""
+	}
 	developerName := ""
 	histories := issue["changelog"].(map[string]interface{})["histories"].([]interface{})
 	for _, history := range histories {
@@ -219,40 +220,24 @@ func encodeStringToBase64(val string) string {
 	return base64.StdEncoding.EncodeToString([]byte(val))
 }
 
-// DisplayProgressAndStatistics displays the Download Progress, total issue count, api calls and time taken in the output terminal
-func displayProgressAndStatistics(totalIssueCount int, currentIssueCount int, totalAPICalls int, totalTime int) {
-
-	fmt.Print("\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r")
-	red := color.New(color.FgHiRed).PrintFunc()
-	cyan := color.New(color.FgHiCyan).PrintFunc()
-	blue := color.New(color.FgHiBlue).PrintFunc()
-	yellow := color.New(color.FgHiYellow).PrintFunc()
-
-	cyan(" Total issues : " + strconv.Itoa(totalIssueCount))
-	fmt.Print(" | ")
-	red(" Total API Calls : " + strconv.Itoa(totalAPICalls))
-	fmt.Print(" | ")
-	blue(" Total Time : " + strconv.Itoa(totalTime) + " (s)")
-	fmt.Print(" | ")
-
-	var percentage int
-	progress := ((totalIssueCount - currentIssueCount) % totalIssueCount)
-
-	if currentIssueCount == -1 {
-		percentage = 0
-	} else if currentIssueCount == 0 {
-		percentage = 100
-	} else {
-		percentage = int(100.0 / (float64(totalIssueCount) / float64(progress)))
-	}
-
-	yellow(" Progress : " + strconv.Itoa(percentage) + "%")
-
-}
-
 //HandleError handles errors
 func HandleError(err error) {
 	if err != nil {
 		panic(err.Error())
+	}
+}
+
+func clean(filters map[string]string) {
+	for k1, v1 := range filters {
+		for k2, v2 := range filters {
+			if v1 == v2 && k1 != k2 {
+				if strings.HasPrefix(k1, "cf[") {
+					delete(filters, k1)
+				}
+				if strings.HasPrefix(k2, "cf[") {
+					delete(filters, k2)
+				}
+			}
+		}
 	}
 }

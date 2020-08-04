@@ -4,312 +4,278 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"time"
+	"sync"
 
-	"github.com/fatih/color"
-
-	httprequest "jiraSearch_git/httprequest"
+	httprequest "goJIRA/httprequest"
 	"os"
 	"strings"
 )
 
-// Configuration represents the configuration file 'config.json'
-type Configuration struct {
-	JiraURL          string
-	Credentials      Credentials
-	Filters          map[string]interface{}
-	FieldsToRetrieve []string
-	DownloadPath     string
-	AuthToken        string
+type configuration struct {
+	jiraURL          string
+	credentials      credentials
+	filters          map[string]interface{}
+	fieldsToRetrieve []string
+	downloadPath     string
+	authToken        string
 }
 
-// SubTask of a Jira Issue
-type SubTask struct {
-	Type         string
-	AssigneeName string
-	TotalHours   string
-	Name         string
+type subTask struct {
+	taskType     string
+	assigneeName string
+	totalHours   string
+	name         string
 }
 
-// Credentials of the user
-type Credentials struct {
-	Username string
-	Password string
+type credentials struct {
+	username string
+	password string
 }
 
-// JiraIssue represents an issue in Jira
-type JiraIssue struct {
-	Data         map[string]interface{}
-	SubTasks     []SubTask
-	Fields       []string
-	AssigneeName string
+type jiraIssue struct {
+	data         map[string]interface{}
+	subTasks     []subTask
+	fields       []string
+	assigneeName string
 }
-
-// ProcessedData represents the filters and fields after replacing custom field ids
-type ProcessedData struct {
-	filters map[string]string
-	fields  []string
-}
-
-var config Configuration
-var workerCount int
 
 // Finder finds the issue from jira based on the config
-type Finder interface {
+type finder interface {
 	Search()
 }
 
 // JiraFinder finds the issue from jira based on the config
 type JiraFinder struct {
+	config configuration
+}
+
+//NewJiraFinder gives a new jira finder with configurations from the config file
+func NewJiraFinder(configFile string) JiraFinder {
+	return JiraFinder{config: config(configFile)}
 }
 
 //Search finds the issue from jira based on the config
-func (com *JiraFinder) Search() {
+func (f JiraFinder) Search() {
 
-	if config.JiraURL == "" {
+	if f.config.jiraURL == "" {
 		panic("Set the config first before searching using SetConfig() func")
 	}
-	start := time.Now()
 
-	// Initialize necessary variables
-	customFieldChannel := make(chan map[string]string)
-	customFieldProcessorChannel := make(chan ProcessedData)
-	issueRetrievedChannel := make(chan JiraIssue)
-	finalIssueChannel := make(chan JiraIssue)
-	outputData := make([][]string, 0)
-	issueCount := 0
-	totalRestCalls := 0
-	totalIssueCount := 0
+	output := [][]string{f.config.fieldsToRetrieve}
 
-	// get all the custom fields first and populate in customFieldChannel
-	totalRestCalls++
-	go getCustomFields(customFieldChannel)
+	out := f.produceFields()
 
-	// listen to custom fields channel and process the data
-	go processCustomFields(customFieldChannel, customFieldProcessorChannel)
+	filters, fields := f.processFields(<-out)
 
-	// listen to processed data and intiate the search based on it
-	go initiateSearch(customFieldProcessorChannel, issueRetrievedChannel, &totalRestCalls)
+	issues := f.search(filters, fields)
 
-	//prepare output with the headers first
-	headers := config.FieldsToRetrieve
-	outputData = append(outputData, headers)
+	issue := f.processIssues(<-issues)
 
-	for {
-		select {
-
-		case issue := <-issueRetrievedChannel:
-			{
-				totalIssueCount++
-				issueCount++
-				displayProgressAndStatistics(totalIssueCount, -1, totalRestCalls, int(time.Since(start).Seconds()))
-				includeChangeLog := strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "bug") || strings.Contains(strings.ToLower(config.Filters["IssueType"].(string)), "issue")
-
-				// listen to issue retrieved channel and assign the sub tasks for it
-				go getSubTasksForIssue(issue, finalIssueChannel, includeChangeLog, &totalRestCalls)
-			}
-
-		case finalIssue := <-finalIssueChannel:
-			{
-				issueCount--
-				fieldValues := make([]string, 0)
-
-				// Listen to final populated issue and prepare the output for all the fields mentioned in the configuration
-				for _, field := range finalIssue.Fields {
-					val, ok := finalIssue.Data[field]
-					if ok {
-						fieldValues = append(fieldValues, strings.Replace(val.(string), ",", "", -1))
-					} else {
-						fieldValues = append(fieldValues, getFieldValue(field, finalIssue))
-					}
-				}
-				if len(fieldValues) > 0 {
-					outputData = append(outputData, fieldValues)
-				}
-
-				displayProgressAndStatistics(totalIssueCount, issueCount, totalRestCalls, int(time.Since(start).Seconds()))
-
-			}
-
-			if issueCount == 0 {
-				// Once all the issues are processed, flush out the output data to the csv file mentioned in the configuration 'DownloadPath'
-				writeToCsv(outputData, config.DownloadPath)
-				displayProgressAndStatistics(totalIssueCount, issueCount, totalRestCalls, int(time.Since(start).Seconds()))
-				fmt.Println()
-				fmt.Println()
-				color.HiGreen(" Download complete!!. Results exported to " + "'" + config.DownloadPath + "'")
-				return
-			}
-
+	for i := range issue {
+		if f := download(i); f != nil {
+			output = append(output, f)
 		}
 	}
+
+	writeToCsv(output, f.config.downloadPath)
+
+	fmt.Println(" Download complete!!. Results exported to " + "'" + f.config.downloadPath + "'")
+
 }
 
-// GetCustomFields gets all the custom fields for the jiraUrl mentioned in the config
-func getCustomFields(customFieldChannel chan map[string]string) {
+func (f JiraFinder) produceFields() chan []map[string]interface{} {
 
-	req := httprequest.NewHTTPRequest(config.JiraURL, "/rest/api/2/field", config.AuthToken, nil)
-	body := req.Send()
+	out := make(chan []map[string]interface{}, 0)
+	go func() {
+		req := httprequest.NewHTTPRequest(f.config.jiraURL, "/rest/api/2/field", f.config.authToken, nil)
+		body := req.Send()
 
-	var fields []map[string]interface{}
-	json.Unmarshal([]byte(body), &fields)
+		var fields []map[string]interface{}
+		json.Unmarshal([]byte(body), &fields)
 
-	var result map[string]string
-	result = make(map[string]string)
-	staticFields := make(map[string]string, 0)
+		out <- fields
+	}()
+
+	return out
+
+}
+
+func (f JiraFinder) processFields(fields []map[string]interface{}) (map[string]string, []string) {
+
+	filters := make(map[string]string, 0)
+	resFields := make([]string, 0)
+
+	var wg sync.WaitGroup
+	wg.Add(len(fields))
 
 	for _, field := range fields {
-		if field["custom"].(bool) {
-			_, ok := result[field["name"].(string)]
-			if !ok {
-				_, isStaticField := staticFields[strings.ToLower(field["name"].(string))]
-				if !isStaticField {
-					result[strings.ToLower(field["name"].(string))] = strings.ToLower(field["id"].(string))
+		go func(field map[string]interface{}) {
+			defer wg.Done()
+			for k, v := range f.config.filters {
+				if strings.ToLower(field["name"].(string)) == strings.ToLower(k) {
+					key := k
+					if field["custom"].(bool) {
+						key = "cf[" + strings.Replace(field["id"].(string), "customfield_", "", -1) + "]"
+					}
+					filters[key] = v.(string)
 				}
 			}
+
+			for _, v := range f.config.fieldsToRetrieve {
+				if strings.ToLower(field["name"].(string)) == strings.ToLower(v) {
+					val := v
+					if field["custom"].(bool) {
+						val = fmt.Sprint(field["id"].(string))
+					}
+					resFields = append(resFields, val)
+				}
+			}
+		}(field)
+
+	}
+
+	wg.Wait()
+
+	clean(filters)
+
+	return filters, resFields
+}
+
+func (f JiraFinder) search(filters map[string]string, fields []string) chan []jiraIssue {
+	out := make(chan []jiraIssue, 0)
+
+	go func() {
+		params := make(map[string]string, 0)
+		params["jql"] = getJql(filters)
+		params["fields"] = strings.Join(fields, ",")
+		params["maxResults"] = "1000"
+
+		req := httprequest.NewHTTPRequest(f.config.jiraURL, "/rest/api/2/search", f.config.authToken, params)
+		body := req.Send()
+
+		var responseResult map[string]interface{}
+		var issues []interface{}
+		json.Unmarshal([]byte(body), &responseResult)
+
+		issues = responseResult["issues"].([]interface{})
+
+		ji := make([]jiraIssue, 0)
+		for _, issue := range issues {
+			ji = append(ji, jiraIssue{data: issue.(map[string]interface{}), fields: fields})
+		}
+
+		out <- ji
+	}()
+
+	return out
+}
+
+func (f JiraFinder) processIssues(issues []jiraIssue) chan jiraIssue {
+
+	out := make(chan jiraIssue, 100)
+	for i, issue := range issues {
+		go func(issue jiraIssue, i int) {
+			issueID := issue.data["id"].(string)
+			p := f.getIssue(issueID, true)
+			parent := <-p
+			subTasks := parent["fields"].(map[string]interface{})["subtasks"].([]interface{})
+			result := make([]subTask, 0)
+
+			for _, v := range subTasks {
+				st := f.getIssue(v.(map[string]interface{})["id"].(string), false)
+				subTaskIssue := <-st
+				assignee := getValueFromField(subTaskIssue, "assignee")
+				issueType := getValueFromField(subTaskIssue, "issuetype")
+				name := getValueFromField(subTaskIssue, "summary")
+				totalHours := getValueFromField(subTaskIssue, "timetracking")
+				currentSubTask := subTask{taskType: issueType, name: name, assigneeName: assignee, totalHours: totalHours}
+
+				result = append(result, currentSubTask)
+			}
+
+			issue.subTasks = result
+
+			parentIssueType := getValueFromField(parent, "issuetype")
+			if isBug(parentIssueType) {
+				issue.assigneeName = getDeveloperNameFromLog(parent)
+			}
+			out <- issue
+
+			if i == len(issues)-1 {
+				close(out)
+			}
+
+		}(issue, i)
+	}
+
+	return out
+
+}
+
+func (f JiraFinder) getIssue(issueID string, includeChangeLog bool) chan map[string]interface{} {
+
+	out := make(chan map[string]interface{}, 0)
+	go func() {
+		var getIssueURL string
+
+		if includeChangeLog {
+			getIssueURL = "/rest/api/2/issue/" + issueID + "?expand=changelog"
 		} else {
-			_, ok := result[strings.ToLower(field["name"].(string))]
-			if ok {
-				delete(result, strings.ToLower(field["name"].(string)))
-			} else {
-				staticFields[strings.ToLower(field["name"].(string))] = strings.ToLower(field["id"].(string))
-			}
-		}
-	}
-
-	customFieldChannel <- result
-}
-
-// ProcessCustomFields replaces custom field names with cf[customFieldId] for searching purpose
-// Gets the values from customFieldChannel and replaces the names and assign it to processor channel
-func processCustomFields(customFieldChannel chan map[string]string, customFieldProcessorChannel chan ProcessedData) {
-	customFieldMap, ok := <-customFieldChannel
-	substitutedFilters := make(map[string]string)
-	substitutedfieldsToRetrieve := make([]string, 0)
-
-	if ok {
-		for k, v := range config.Filters {
-			_, ok := customFieldMap[strings.ToLower(k)]
-			if ok {
-				equivalentFieldID := customFieldMap[strings.ToLower(k)]
-				keyName := "cf[" + strings.Replace(equivalentFieldID, "customfield_", "", -1) + "]"
-				substitutedFilters[keyName] = v.(string)
-			} else {
-				substitutedFilters[k] = v.(string)
-			}
+			getIssueURL = "/rest/api/2/issue/" + issueID
 		}
 
-		for _, v := range config.FieldsToRetrieve {
-			_, ok = customFieldMap[strings.ToLower(v)]
-			if ok {
-				equivalentFieldID := customFieldMap[strings.ToLower(v)]
-				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, fmt.Sprint(equivalentFieldID))
-			} else {
-				substitutedfieldsToRetrieve = append(substitutedfieldsToRetrieve, strings.ToLower(v))
-			}
+		req := httprequest.NewHTTPRequest(f.config.jiraURL, getIssueURL, f.config.authToken, nil)
+		body := req.Send()
+
+		var responseResult map[string]interface{}
+		json.Unmarshal([]byte(body), &responseResult)
+
+		out <- responseResult
+	}()
+
+	return out
+}
+
+func download(issue jiraIssue) []string {
+	fieldValues := make([]string, 0)
+
+	// Listen to final populated issue and prepare the output for all the fields mentioned in the configuration
+	for _, field := range issue.fields {
+		val, ok := issue.data[field]
+		if ok {
+			fieldValues = append(fieldValues, strings.Replace(val.(string), ",", "", -1))
+		} else {
+			fieldValues = append(fieldValues, getFieldValue(field, issue))
 		}
 	}
-	processedValues := ProcessedData{filters: substitutedFilters, fields: substitutedfieldsToRetrieve}
-	customFieldProcessorChannel <- processedValues
+	if len(fieldValues) > 0 {
+		return fieldValues
+	}
+	return nil
 }
 
-// InitiateSearch initiates the search process
-func initiateSearch(customFieldProcessorChannel chan ProcessedData, issueRetrievedChannel chan JiraIssue, totalRestCalls *int) {
-	processedValues, ok := <-customFieldProcessorChannel
-	if ok {
-		*totalRestCalls++
-		go searchIssues(getJql(processedValues.filters), processedValues.fields, issueRetrievedChannel)
-	}
-}
-
-// GetIssue fetches Issue based from the jiraUrl in the config and issueId passed
-func getIssue(issueID string, includeChangeLog bool) map[string]interface{} {
-
-	var getIssueURL string
-
-	if includeChangeLog {
-		getIssueURL = "/rest/api/2/issue/" + issueID + "?expand=changelog"
-	} else {
-		getIssueURL = "/rest/api/2/issue/" + issueID
-	}
-
-	req := httprequest.NewHTTPRequest(config.JiraURL, getIssueURL, config.AuthToken, nil)
-	body := req.Send()
-
-	var responseResult map[string]interface{}
-	json.Unmarshal([]byte(body), &responseResult)
-
-	return responseResult
-}
-
-//GetSubTasksForIssue ..
-func getSubTasksForIssue(issue JiraIssue, finalIssueChannel chan JiraIssue, includeChangeLog bool, totalRestCalls *int) {
-
-	issueID := issue.Data["id"].(string)
-	*totalRestCalls++
-	parent := getIssue(issueID, includeChangeLog)
-	subTasks := parent["fields"].(map[string]interface{})["subtasks"].([]interface{})
-	result := make([]SubTask, 0)
-
-	for _, subTask := range subTasks {
-		*totalRestCalls++
-		subTaskIssue := getIssue(subTask.(map[string]interface{})["id"].(string), false)
-		assignee := getValueFromField(subTaskIssue, "assignee")
-		issueType := getValueFromField(subTaskIssue, "issuetype")
-		name := getValueFromField(subTaskIssue, "summary")
-		totalHours := getValueFromField(subTaskIssue, "timetracking")
-		currentSubTask := SubTask{Type: issueType, Name: name, AssigneeName: assignee, TotalHours: totalHours}
-
-		result = append(result, currentSubTask)
-	}
-
-	issue.SubTasks = result
-
-	parentIssueType := getValueFromField(parent, "issuetype")
-	if isBug(parentIssueType) {
-		issue.AssigneeName = getDeveloperNameFromLog(parent)
-	}
-
-	finalIssueChannel <- issue
-
-}
-
-func searchIssues(jql string, processedFields []string, issueRetrievedChannel chan JiraIssue) {
-
-	params := make(map[string]string, 0)
-	params["jql"] = jql
-	params["fields"] = strings.Join(processedFields, ",")
-	params["maxResults"] = "1000"
-
-	req := httprequest.NewHTTPRequest(config.JiraURL, "/rest/api/2/search", config.AuthToken, params)
-	body := req.Send()
-
-	var responseResult map[string]interface{}
-	var issues []interface{}
-	json.Unmarshal([]byte(body), &responseResult)
-
-	issues = responseResult["issues"].([]interface{})
-
-	for _, issue := range issues {
-		jiraIssue := JiraIssue{Data: issue.(map[string]interface{}), Fields: processedFields}
-		issueRetrievedChannel <- jiraIssue
-	}
-
-}
-
-//SetConfig ..
-func SetConfig(confgFile string) {
-	fmt.Println()
-	color.Yellow(" Fetching data based on the configuration file => " + "'" + confgFile + "'")
-	fmt.Println()
+func config(confgFile string) configuration {
+	var c map[string]interface{}
+	fmt.Println(" Fetching data based on the configuration file => " + "'" + confgFile + "'")
 	jsonFile, err := os.Open(confgFile)
 	HandleError(err)
 
 	defer jsonFile.Close()
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
-	json.Unmarshal([]byte(byteValue), &config)
+	json.Unmarshal([]byte(byteValue), &c)
+	config := load(c)
+	config.authToken = encodeStringToBase64(config.credentials.username + ":" + config.credentials.password)
+	return config
+}
 
-	config.AuthToken = encodeStringToBase64(config.Credentials.Username + ":" + config.Credentials.Password)
-	workerCount = 20
+func load(c map[string]interface{}) configuration {
+	config := configuration{jiraURL: c["JiraUrl"].(string), downloadPath: c["DownloadPath"].(string)}
+	config.filters = c["Filters"].(map[string]interface{})
+	config.fieldsToRetrieve = []string{}
+	for _, f := range c["FieldsToRetrieve"].([]interface{}) {
+		config.fieldsToRetrieve = append(config.fieldsToRetrieve, f.(string))
+	}
+	config.credentials = credentials{username: c["Credentials"].(map[string]interface{})["Username"].(string), password: c["Credentials"].(map[string]interface{})["Password"].(string)}
+	return config
 }

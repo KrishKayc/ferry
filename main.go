@@ -1,12 +1,9 @@
 package main
 
-import "jiraSearch_git/jirafinder"
+import "goJIRA/jirafinder"
 
 func main() {
-	//Read config from the 'config.json' file
-	jirafinder.SetConfig("config.json")
-	f := &jirafinder.JiraFinder{}
-
+	f := jirafinder.NewJiraFinder("config.json")
 	f.Search()
 
 }
