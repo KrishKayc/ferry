@@ -1,4 +1,4 @@
-# jirasearch
+# ferry - JIRA search
 Utility to Search and download Issues From JIRA with a configurable Filters and return fields. Retrieved Issues from JIRA will be downloaded as CSV in the path specified in the config.json file.
 
 **config.json** file specifies.
