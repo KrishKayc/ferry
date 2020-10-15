@@ -2,3 +2,5 @@
 .env
 
 vendor
+
+coverage.txt
