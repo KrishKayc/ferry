@@ -1,8 +1,20 @@
 package main
 
-import "github.com/gojira/ferry/jirafinder"
+import (
+	"fmt"
+	"github.com/gojira/ferry/jirafinder"
+	"log"
+)
 
 func main() {
-	f := jirafinder.NewJiraFinder("config.json")
-	f.Search()
+	err, f := jirafinder.NewJiraFinder("config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := f.Search(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(" Download complete!!. Results exported to " + "'" + f.Config.DownloadPath + "'")
 }

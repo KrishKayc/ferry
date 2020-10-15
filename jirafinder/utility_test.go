@@ -15,8 +15,8 @@ func (mc *MockHTTPRequest) Send() []byte {
 
 func TestGetNumberOfFunctionalBugs(t *testing.T) {
 	subTasks := make([]SubTask, 0)
-	subTask1 := SubTask{Type: "Functional Bug"}
-	subTask2 := SubTask{Type: "Story"}
+	subTask1 := SubTask{TaskType: "Functional Bug"}
+	subTask2 := SubTask{TaskType: "Story"}
 
 	subTasks = append(subTasks, subTask1, subTask2)
 

@@ -4,3 +4,6 @@
 vendor
 
 coverage.txt
+
+config.json
+output
