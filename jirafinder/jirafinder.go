@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"sync"
 
-	httprequest "goJIRA/httprequest"
+	httprequest "github.com/gojira/ferry/httprequest"
 	"os"
 	"strings"
 )

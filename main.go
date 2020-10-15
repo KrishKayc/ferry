@@ -1,9 +1,8 @@
 package main
 
-import "goJIRA/jirafinder"
+import "github.com/gojira/ferry/jirafinder"
 
 func main() {
 	f := jirafinder.NewJiraFinder("config.json")
 	f.Search()
-
 }
