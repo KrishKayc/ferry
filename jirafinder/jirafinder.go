@@ -80,8 +80,6 @@ func (f JiraFinder) UseStub() {
 
 //Search finds the issue from jira based on the config
 func (f JiraFinder) Search() error {
-	f.UseStub()
-
 	output := [][]string{f.Config.FieldsToRetrieve}
 
 	err, out := f.produceFields()
