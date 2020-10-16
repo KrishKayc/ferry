@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"fmt"
+	"github.com/pkg/errors"
 
 	"os"
 	"strconv"
@@ -11,26 +12,23 @@ import (
 	"time"
 )
 
-func writeToCsv(results [][]string, path string) {
-
-	if len(results) > 0 {
-
-		file, err := os.Create(path)
-
-		HandleError(err)
-
-		defer file.Close()
-
-		writer := csv.NewWriter(file)
-		defer writer.Flush()
-
-		err = writer.WriteAll(results)
-
-		HandleError(err)
-
-	} else {
-		fmt.Println("No issues found to download")
+func writeToCsv(results [][]string, path string) error {
+	if len(results) == 0 {
+		fmt.Printf("No issues found to download")
+		return nil
 	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create file")
+	}
+
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	return errors.Wrapf(writer.WriteAll(results), "failed to write into to csv file")
 }
 
 func getJql(filters map[string]string) string {
@@ -71,19 +69,19 @@ func getInFilterValue(values []string) string {
 }
 
 // GetFieldValue gets the field value based on the field name
-func getFieldValue(field string, issue jiraIssue) string {
+func getFieldValue(field string, issue JiraIssue) string {
 	if field == "assignee" {
-		if issue.assigneeName != "" {
-			return issue.assigneeName
+		if issue.AssigneeName != "" {
+			return issue.AssigneeName
 		}
-		return getDevTaskAssigneeName(issue.subTasks)
+		return getDevTaskAssigneeName(issue.SubTasks)
 	} else if field == "bug count" {
-		return fmt.Sprint(getNumberOfFunctionalBugs(issue.subTasks))
+		return fmt.Sprint(getNumberOfFunctionalBugs(issue.SubTasks))
 	} else if field == "complexity" {
-		return getComplexityBasedOnDevEstimation(issue.subTasks)
+		return getComplexityBasedOnDevEstimation(issue.SubTasks)
 	}
 
-	return getValueFromField(issue.data, field)
+	return getValueFromField(issue.Data, field)
 }
 
 // GetValueFromField gets the value from the 'fields' property of the issue
@@ -141,10 +139,10 @@ func getNestedMapKeyName(fieldName string) string {
 }
 
 // GetDevTaskAssigneeName gets Assignee name of the dev task, exclude code review task
-func getDevTaskAssigneeName(subTasks []subTask) string {
+func getDevTaskAssigneeName(subTasks []SubTask) string {
 	for _, subTask := range subTasks {
-		if strings.Contains(subTask.name, "Dev") && !strings.Contains(subTask.name, "code review") {
-			return subTask.assigneeName
+		if strings.Contains(subTask.Name, "Dev") && !strings.Contains(subTask.Name, "code review") {
+			return subTask.AssigneeName
 		}
 	}
 
@@ -152,10 +150,10 @@ func getDevTaskAssigneeName(subTasks []subTask) string {
 }
 
 // GetNumberOfFunctionalBugs gets the total number of functional issues in the sub tasks
-func getNumberOfFunctionalBugs(subTasks []subTask) int {
+func getNumberOfFunctionalBugs(subTasks []SubTask) int {
 	numberOfFunctionalBugs := 0
 	for _, subTask := range subTasks {
-		if subTask.taskType == "Functional Bug" {
+		if subTask.TaskType == "Functional Bug" {
 			numberOfFunctionalBugs++
 		}
 	}
@@ -163,11 +161,11 @@ func getNumberOfFunctionalBugs(subTasks []subTask) int {
 }
 
 // GetComplexityBasedOnDevEstimation gets the complexity based on dev estimation
-func getComplexityBasedOnDevEstimation(subTasks []subTask) string {
+func getComplexityBasedOnDevEstimation(subTasks []SubTask) string {
 	totalHours := 0
 	for _, subTask := range subTasks {
-		if strings.Contains(subTask.name, "Dev") && !strings.Contains(subTask.name, "code review") {
-			hours, _ := strconv.Atoi(strings.TrimRight(subTask.totalHours, "h"))
+		if strings.Contains(subTask.Name, "Dev") && !strings.Contains(subTask.Name, "code review") {
+			hours, _ := strconv.Atoi(strings.TrimRight(subTask.TotalHours, "h"))
 			totalHours += hours
 		}
 	}

@@ -1,0 +1,9 @@
+.idea
+.env
+
+vendor
+
+coverage.txt
+
+config.json
+output

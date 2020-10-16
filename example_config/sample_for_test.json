@@ -5,18 +5,15 @@
   },
   "Filters": {
     "Project": "your_jira_project",
-    "IssueType": "Story",
-    "Sprint": "The sprint name here"
+    "IssueType": "Bug",
+    "Sprint": "Sprint 1"
   },
   "FieldsToRetrieve": [
     "key",
     "summary",
     "assignee",
-    "scrum team",
-    "story points",
-    "complexity",
-    "bug count"
+    "scrum team"
   ],
-  "DownloadPath": "E:\\jiraResults.csv",
+  "DownloadPath": "../output/test.csv",
   "JiraUrl": "https://your-jira-url.com"
 }

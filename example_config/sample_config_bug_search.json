@@ -1,15 +1,20 @@
 {
-    "Credentials": {
-      "Username": "your_jira_username",
-      "Password": "your_jira_password"
-    },
-    "Filters": {
-      "Project": "your_jira_project",
-      "IssueType": "Bug",
-      "Sprint":"Sprint 1"
-    },    
-    "FieldsToRetrieve":["key","summary","assignee","scrum team"],
-    "DownloadPath": "E:\\jiraResults.csv",
-    "JiraUrl": "https://your-jira-url.com"
-  }
-  
+  "Credentials": {
+    "Username": "your_jira_username",
+    "Password": "your_jira_password"
+  },
+  "Filters": {
+    "Project": "your_jira_project",
+    "IssueType": "Bug",
+    "Sprint": "Sprint 1"
+  },
+  "FieldsToRetrieve": [
+    "key",
+    "summary",
+    "assignee",
+    "customfield_10016",
+    "scrum team"
+  ],
+  "DownloadPath": "E:\\jiraResults.csv",
+  "JiraUrl": "https://your-jira-url.com"
+}
