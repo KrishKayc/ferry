@@ -1,7 +1,6 @@
 package jirafinder
 
 import (
-	"encoding/base64"
 	"encoding/csv"
 	"fmt"
 	"github.com/pkg/errors"
@@ -212,10 +211,6 @@ func getDeveloperNameFromLog(issue map[string]interface{}) string {
 
 	return developerName
 
-}
-
-func encodeStringToBase64(val string) string {
-	return base64.StdEncoding.EncodeToString([]byte(val))
 }
 
 //HandleError handles errors

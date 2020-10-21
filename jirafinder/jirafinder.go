@@ -3,17 +3,25 @@ package jirafinder
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gojira/ferry/config"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	httprequest "github.com/gojira/ferry/httprequest"
 )
+
+type keyPairValue struct {
+	key   string
+	value string
+}
+
+type fieldParam struct {
+	key  int
+	name string
+}
 
 type SearchResult struct {
 	StartAt    int           `json:"startAt"`
@@ -22,25 +30,11 @@ type SearchResult struct {
 	Issues     []interface{} `json:"issues"`
 }
 
-type Configuration struct {
-	JiraURL          string                 `json:"JiraUrl"`
-	Credentials      Credentials            `json:"Credentials"`
-	Filters          map[string]interface{} `json:"Filters"`
-	FieldsToRetrieve []string               `json:"FieldsToRetrieve"`
-	DownloadPath     string                 `json:"DownloadPath"`
-	AuthToken        string
-}
-
 type SubTask struct {
 	TaskType     string
 	AssigneeName string
 	TotalHours   string
 	Name         string
-}
-
-type Credentials struct {
-	Username string
-	Password string
 }
 
 type JiraIssue struct {
@@ -52,17 +46,25 @@ type JiraIssue struct {
 
 // JiraFinder finds the issue from jira based on the config
 type JiraFinder struct {
-	Config Configuration
-	api    *httprequest.JiraClient
+	Config    config.Configuration
+	api       *httprequest.JiraClient
+	filtersCh chan keyPairValue
+	fieldsCh  chan fieldParam
+	fieldKeys []string
+	mu        sync.RWMutex
 }
 
-//NewJiraFinder gives a new jira finder with configurations from the config file
-func NewJiraFinder(configFile string) (error, *JiraFinder) {
-	err, c := createConfig(configFile)
+func NewJiraFinderFomFile(configFile string) (error, *JiraFinder) {
+	err, c := config.New(configFile)
 	if err != nil {
 		return err, nil
 	}
 
+	return NewJiraFinder(c)
+}
+
+//NewJiraFinder gives a new jira finder with configurations from the config file
+func NewJiraFinder(c *config.Configuration) (error, *JiraFinder) {
 	if c.JiraURL == "" {
 		return errors.New("no config file found. Set the config first before searching using SetConfig() func"), nil
 	}
@@ -70,16 +72,22 @@ func NewJiraFinder(configFile string) (error, *JiraFinder) {
 	return nil, &JiraFinder{
 		Config: *c,
 		api:    httprequest.NewClient(c.JiraURL, c.AuthToken),
+
+		filtersCh: make(chan keyPairValue),
+		fieldsCh:  make(chan fieldParam),
+
+		fieldKeys: make([]string, len(c.FieldsToRetrieve)),
+		mu:        sync.RWMutex{},
 	}
 }
 
 // UseStub enforces usage of httptest
-func (f JiraFinder) UseStub() {
+func (f *JiraFinder) UseStub() {
 	f.api.UseStub()
 }
 
 //Search finds the issue from jira based on the config
-func (f JiraFinder) Search() error {
+func (f *JiraFinder) Search() error {
 	output := [][]string{f.Config.FieldsToRetrieve}
 
 	err, out := f.produceFields()
@@ -88,7 +96,6 @@ func (f JiraFinder) Search() error {
 	}
 
 	filters, fields := f.processFields(out)
-
 	err, response := f.search(filters, fields)
 	if err != nil {
 		return err
@@ -114,7 +121,7 @@ func (f JiraFinder) Search() error {
 	return writeToCsv(output, f.Config.DownloadPath)
 }
 
-func (f JiraFinder) produceFields() (error, []map[string]interface{}) {
+func (f *JiraFinder) produceFields() (error, []map[string]interface{}) {
 	body := f.api.Get("/rest/api/2/field", nil)
 
 	var fields []map[string]interface{}
@@ -126,34 +133,52 @@ func (f JiraFinder) produceFields() (error, []map[string]interface{}) {
 	return nil, fields
 }
 
-func (f JiraFinder) processFields(fields []map[string]interface{}) (map[string]string, []string) {
+func (f *JiraFinder) collectParams(kpDestination map[string]string) {
+	for {
+		select {
+		case kv, open := <-f.filtersCh:
+			if open {
+				kpDestination[kv.key] = kv.value
+			}
 
-	filters := make(map[string]string, 0)
-	resFields := make([]string, 0)
+		case fp, open := <-f.fieldsCh:
+			if open && fp.name != "" {
+				f.addField(fp)
+			}
+		}
+	}
+}
+
+func (f *JiraFinder) processFields(fields []map[string]interface{}) (map[string]string, []string) {
+
+	filters := make(map[string]string)
 
 	var wg sync.WaitGroup
 	wg.Add(len(fields))
 
+	go f.collectParams(filters)
+
 	for _, field := range fields {
 		go func(field map[string]interface{}) {
 			defer wg.Done()
+
 			for k, v := range f.Config.Filters {
 				if strings.ToLower(field["name"].(string)) == strings.ToLower(k) {
 					key := k
 					if field["custom"].(bool) {
 						key = "cf[" + strings.Replace(field["id"].(string), "customfield_", "", -1) + "]"
 					}
-					filters[key] = v.(string)
+					f.filtersCh <- keyPairValue{key, v.(string)}
 				}
 			}
 
-			for _, v := range f.Config.FieldsToRetrieve {
+			for i, v := range f.Config.FieldsToRetrieve {
 				if strings.ToLower(field["name"].(string)) == strings.ToLower(v) {
 					val := v
 					if field["custom"].(bool) {
 						val = fmt.Sprint(field["id"].(string))
 					}
-					resFields = append(resFields, val)
+					f.fieldsCh <- fieldParam{i, val}
 				}
 			}
 		}(field)
@@ -161,19 +186,36 @@ func (f JiraFinder) processFields(fields []map[string]interface{}) (map[string]s
 
 	wg.Wait()
 
+	close(f.filtersCh)
+	close(f.fieldsCh)
 	clean(filters)
 
-	return filters, resFields
+	return filters, f.fieldKeys
 }
 
-func (f JiraFinder) search(filters map[string]string, fields []string) (error, *SearchResult) {
+func (f *JiraFinder) addField(field fieldParam) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.fieldKeys[field.key] = field.name
+}
+
+func (f *JiraFinder) setFields(params map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// prevent data race
+	params["fields"] = strings.Join(f.fieldKeys, ",")
+}
+
+func (f *JiraFinder) search(filters map[string]string, fields []string) (error, *SearchResult) {
 	var step int64 = 100
 	var startAt int64 = 0
 	params := make(map[string]string)
 	params["jql"] = getJql(filters)
-	params["fields"] = strings.Join(fields, ",")
 	params["maxResults"] = strconv.FormatInt(step, 10)
 	params["startAt"] = strconv.FormatInt(startAt, 10)
+	f.setFields(params)
 
 	err, result := f.doSearchByParams(params)
 	if err != nil {
@@ -200,7 +242,7 @@ func (f JiraFinder) search(filters map[string]string, fields []string) (error, *
 	return nil, result
 }
 
-func (f JiraFinder) doSearchByParams(params map[string]string) (error, *SearchResult) {
+func (f *JiraFinder) doSearchByParams(params map[string]string) (error, *SearchResult) {
 	result := new(SearchResult)
 
 	body := f.api.Get("/rest/api/2/search", params)
@@ -212,7 +254,7 @@ func (f JiraFinder) doSearchByParams(params map[string]string) (error, *SearchRe
 	return nil, result
 }
 
-func (f JiraFinder) prepareIssueObjects(result *SearchResult, fields []string) []JiraIssue {
+func (f *JiraFinder) prepareIssueObjects(result *SearchResult, fields []string) []JiraIssue {
 	ji := make([]JiraIssue, 0)
 	for _, rawIssue := range result.Issues {
 		if issue, ok := rawIssue.(map[string]interface{}); ok {
@@ -223,7 +265,7 @@ func (f JiraFinder) prepareIssueObjects(result *SearchResult, fields []string) [
 	return ji
 }
 
-func (f JiraFinder) processIssues(issues []JiraIssue) chan *JiraIssue {
+func (f *JiraFinder) processIssues(issues []JiraIssue) chan *JiraIssue {
 
 	out := make(chan *JiraIssue, 100)
 	for i, issue := range issues {
@@ -264,7 +306,7 @@ func (f JiraFinder) processIssues(issues []JiraIssue) chan *JiraIssue {
 	return out
 }
 
-func (f JiraFinder) getIssue(issueID string, includeChangeLog bool) (error, map[string]interface{}) {
+func (f *JiraFinder) getIssue(issueID string, includeChangeLog bool) (error, map[string]interface{}) {
 	var responseResult map[string]interface{}
 	var getIssueURL string
 
@@ -300,56 +342,4 @@ func download(issue JiraIssue) []string {
 	}
 
 	return []string{}
-}
-
-func ensureFile(confgFile string) (error, string)  {
-	if confgFile == "" {
-		return errors.New("empty config not allowed"), ""
-	}
-
-	if !filepath.IsAbs(confgFile) {
-		wd, _ := os.Getwd()
-		confgFile = filepath.Join(wd, confgFile)
-	}
-
-	// ensure configFile is a valid file
-	i, err := os.Stat(confgFile)
-	if err != nil {
-		return err, ""
-	}
-
-	if i.IsDir() {
-		return errors.Wrapf(err, "invalid config file"), ""
-	}
-
-	return nil, confgFile
-}
-
-func createConfig(confgFile string) (error, *Configuration) {
-	var c *Configuration
-
-	err, confgFile := ensureFile(confgFile)
-	if err != nil {
-		return err, nil
-	}
-
-	fmt.Println(" Fetching data based on the configuration file => " + "'" + confgFile + "'")
-
-	jsonFile, err := os.Open(confgFile)
-	if err != nil {
-		return errors.Wrapf(err, "failed to open config file"), nil
-	}
-
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	err = json.Unmarshal([]byte(byteValue), &c)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse config file"), nil
-	}
-
-	c.AuthToken = encodeStringToBase64(c.Credentials.Username + ":" + c.Credentials.Password)
-
-	return nil, c
 }
