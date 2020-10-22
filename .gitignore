@@ -7,3 +7,5 @@ coverage.txt
 
 config.json
 output
+bin
+dist
