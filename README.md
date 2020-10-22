@@ -1,6 +1,33 @@
 # ferry - JIRA search
 Utility to Search and download Issues From JIRA with a configurable Filters and return fields. Retrieved Issues from JIRA will be downloaded as CSV in the path specified in the config.json file.
 
+## Command-line ##
+**Usage**
+
+    ferry [flags]
+
+    ferry [command]
+
+**Available Commands**
+```
+    export      Search and export Issues From JIRA
+    help        Help about any command
+    version     Print the version
+```
+
+**Flags**
+```
+  -h, --help   help for ferry
+```
+
+Use "ferry [command] --help" for more information about a command.
+
+
+**export command**
+```
+ferry export --config config.json --project "Your Project" --output ~/Documents/ferry.csv
+```
+
 **config.json** file specifies.
 
     * Filters to be applied. Example : Project, Issue Type, Sprint etc
@@ -8,9 +35,9 @@ Utility to Search and download Issues From JIRA with a configurable Filters and 
 
     
 
-[![Build Status](https://travis-ci.org/KrishKayc/jirasearch.svg?branch=master)](https://travis-ci.org/KrishKayc/jirasearch)  [![codecov](https://codecov.io/gh/KrishKayc/jirasearch/branch/master/graph/badge.svg)](https://codecov.io/gh/KrishKayc/jirasearch)      [![Go Report Card](https://goreportcard.com/badge/github.com/KrishKayc/jirasearch)](https://goreportcard.com/report/github.com/KrishKayc/jirasearch)
+[![Build Status](https://travis-ci.org/KrishKayc/ferry.svg?branch=master)](https://travis-ci.org/KrishKayc/ferry)  [![codecov](https://codecov.io/gh/KrishKayc/ferry/branch/master/graph/badge.svg)](https://codecov.io/gh/KrishKayc/ferry)      [![Go Report Card](https://goreportcard.com/badge/github.com/KrishKayc/ferry)](https://goreportcard.com/report/github.com/KrishKayc/ferry)
 
-# Output:
+## Output ##
 **Download InProgress**:
 
 ![Output](https://github.com/KrishKayc/goJIRA/blob/master/output_screenshots/jiraSearch_finaloutput1.jpg)

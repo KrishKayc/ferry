@@ -1,11 +1,18 @@
 language : go
 
+env:
+  GO111MODULE=on
+
 go:
    - "1.x"
    - "1.11.x"
    
 before_install:
   - go get -t -v ./...
+
+before_script:
+  - mkdir -p output
+  - chmod a+rw output
 
 script:
   - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
