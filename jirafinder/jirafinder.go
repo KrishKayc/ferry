@@ -3,12 +3,13 @@ package jirafinder
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gojira/ferry/config"
-	"github.com/pkg/errors"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/gojira/ferry/config"
+	"github.com/pkg/errors"
 
 	httprequest "github.com/gojira/ferry/httprequest"
 )
@@ -46,7 +47,7 @@ type JiraIssue struct {
 
 // JiraFinder finds the issue from jira based on the config
 type JiraFinder struct {
-	Config    config.Configuration
+	Config    config.Config
 	api       *httprequest.JiraClient
 	filtersCh chan keyPairValue
 	fieldsCh  chan fieldParam
@@ -54,29 +55,20 @@ type JiraFinder struct {
 	mu        sync.RWMutex
 }
 
-func NewJiraFinderFomFile(configFile string) (error, *JiraFinder) {
-	err, c := config.New(configFile)
-	if err != nil {
-		return err, nil
-	}
-
-	return NewJiraFinder(c)
-}
-
 //NewJiraFinder gives a new jira finder with configurations from the config file
-func NewJiraFinder(c *config.Configuration) (error, *JiraFinder) {
-	if c.JiraURL == "" {
+func NewJiraFinder(c *config.Config) (error, *JiraFinder) {
+	if c.URL == "" {
 		return errors.New("no config file found. Set the config first before searching using SetConfig() func"), nil
 	}
 
 	return nil, &JiraFinder{
 		Config: *c,
-		api:    httprequest.NewClient(c.JiraURL, c.AuthToken),
+		api:    httprequest.NewClient(c.URL, c.AuthToken()),
 
 		filtersCh: make(chan keyPairValue),
 		fieldsCh:  make(chan fieldParam),
 
-		fieldKeys: make([]string, len(c.FieldsToRetrieve)),
+		fieldKeys: make([]string, len(c.Fields)),
 		mu:        sync.RWMutex{},
 	}
 }
@@ -88,7 +80,7 @@ func (f *JiraFinder) UseStub() {
 
 //Search finds the issue from jira based on the config
 func (f *JiraFinder) Search() error {
-	output := [][]string{f.Config.FieldsToRetrieve}
+	output := [][]string{f.Config.Fields}
 
 	err, out := f.produceFields()
 	if err != nil {
@@ -118,11 +110,13 @@ func (f *JiraFinder) Search() error {
 		}
 	}
 
-	return writeToCsv(output, f.Config.DownloadPath)
+	return writeToCsv(output)
 }
 
 func (f *JiraFinder) produceFields() (error, []map[string]interface{}) {
 	body := f.api.Get("/rest/api/2/field", nil)
+
+	fmt.Println(string(body))
 
 	var fields []map[string]interface{}
 	err := json.Unmarshal(body, &fields)
@@ -172,7 +166,7 @@ func (f *JiraFinder) processFields(fields []map[string]interface{}) (map[string]
 				}
 			}
 
-			for i, v := range f.Config.FieldsToRetrieve {
+			for i, v := range f.Config.Fields {
 				if strings.ToLower(field["name"].(string)) == strings.ToLower(v) {
 					val := v
 					if field["custom"].(bool) {

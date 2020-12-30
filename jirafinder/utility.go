@@ -3,6 +3,7 @@ package jirafinder
 import (
 	"encoding/csv"
 	"fmt"
+
 	"github.com/pkg/errors"
 
 	"os"
@@ -11,13 +12,13 @@ import (
 	"time"
 )
 
-func writeToCsv(results [][]string, path string) error {
+func writeToCsv(results [][]string) error {
 	if len(results) == 0 {
 		fmt.Printf("No issues found to download")
 		return nil
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create("output.csv")
 	if err != nil {
 		return errors.Wrapf(err, "failed to create file")
 	}
@@ -107,7 +108,10 @@ func getValue(val interface{}, fieldName string) string {
 	arrayVal, isArray := val.([]interface{})
 	mapVal, isMap := val.(map[string]interface{})
 	if isArray {
-		result = arrayVal[0].(map[string]interface{})["value"].(string)
+		r := arrayVal[0].(map[string]interface{})["value"]
+		if r != nil {
+			result = r.(string)
+		}
 	} else if isMap {
 		tmpResult, ok := mapVal[getNestedMapKeyName(fieldName)]
 		if ok {

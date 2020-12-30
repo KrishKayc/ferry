@@ -9,3 +9,7 @@ config.json
 output
 bin
 dist
+ferry
+.DS_Store
+*.swp
+*.csv
