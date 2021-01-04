@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gojira/ferry/cmd"
+	"github.com/gojira/jira/cmd"
 )
 
 func main() {

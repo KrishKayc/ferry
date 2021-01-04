@@ -1,48 +1,54 @@
-# ferry - JIRA search
-Utility to Search and download Issues From JIRA with a configurable Filters and return fields. Retrieved Issues from JIRA will be downloaded as CSV in the path specified in the config.json file.
+
+
+# jira - search
+CLI utility to search and download issues (stories/bugs/tasks) From JIRA with a configurable 'filters' and return 'fields'. Retrieved issues from JIRA will be downloaded to 'output.csv'
 
 ## Command-line ##
 **Usage**
 
-    ferry [flags]
-
-    ferry [command]
+    jira search [flags]
 
 **Available Commands**
 ```
-    export      Search and export Issues From JIRA
+    search      Search and export Issues From JIRA
     help        Help about any command
-    version     Print the version
 ```
 
 **Flags**
 ```
-  -h, --help   help for ferry
+  -h, --help   help for jira
 ```
 
-Use "ferry [command] --help" for more information about a command.
+Use "jira [command] --help" for more information about a command.
 
 
-**export command**
+**Search**
+
+**Simple Search**
+
 ```
-ferry export --config config.json --project "Your Project" --output ~/Documents/ferry.csv
+ jira search --project "Your Project" --issuetype Story 
 ```
 
-**config.json** file specifies.
+**Filter multiple 'issue types'**
 
-    * Filters to be applied. Example : Project, Issue Type, Sprint etc
-    * FieldsToRetrive to be rendered as columns in the downloaded csv file
-
+```
+ jira search --project "Your Project" --issuetype "Story,Bug,SubTask"
+```
     
+**Return specified fields**
+```
+ jira search --project "Your Project" --issuetype "Story" --fields "summary,assignee,reporter,sprint" 
+```
 
-[![Build Status](https://travis-ci.org/KrishKayc/ferry.svg?branch=master)](https://travis-ci.org/KrishKayc/ferry)  [![codecov](https://codecov.io/gh/KrishKayc/ferry/branch/master/graph/badge.svg)](https://codecov.io/gh/KrishKayc/ferry)      [![Go Report Card](https://goreportcard.com/badge/github.com/KrishKayc/ferry)](https://goreportcard.com/report/github.com/KrishKayc/ferry)
+**Apply Filters**
+*The below command will pull all the **Bugs** from **sprint5** assigned to the user **John***
+```
+ jira search --project "Your Project" --issuetype "Bug" --fields "summary,sprint" --filters "sprint:sprint5,assignee:John"
+```
 
-## Output ##
-**Download InProgress**:
 
-![Output](https://github.com/KrishKayc/goJIRA/blob/master/output_screenshots/jiraSearch_finaloutput1.jpg)
 
-**Download Complete**:
 
-![FinalOutput](https://github.com/KrishKayc/goJIRA/blob/master/output_screenshots/jiraSearch_finaloutput2.jpg)
+
 

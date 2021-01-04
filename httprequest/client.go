@@ -1,5 +1,10 @@
 package httprequest
 
+//Client represent the REST API client
+type Client interface {
+	Get(path string, params map[string]string) []byte
+}
+
 // JiraClient represents a basic API client for Jira Rest API
 type JiraClient struct {
 	URL       string

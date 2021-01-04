@@ -12,9 +12,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ferry",
+	Use:   "jira",
 	Short: "JIRA searcher. Fetches stories/bugs from your JIRA",
-	Long:  "Utility to Search and download Issues From JIRA with a configurable Filters and return fields. Retrieved Issues from JIRA will be downloaded as CSV in the path specified in the 'output' flag of the 'search' command.",
+	Long:  "jira CLI to Search and download Issues From JIRA with a configurable Filters and return fields. Retrieved Issues from JIRA will be downloaded as CSV in the path specified in the 'output' flag of the 'search' command.",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Usage()
 	},

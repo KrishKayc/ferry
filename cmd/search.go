@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gojira/jira/httprequest"
+	"github.com/gojira/jira/search"
 	"github.com/spf13/cobra"
-
-	"github.com/gojira/ferry/config"
-	"github.com/gojira/ferry/jirafinder"
 )
 
 type flagParsingError struct {
@@ -22,10 +21,11 @@ func (e *flagParsingError) Error() string {
 }
 
 var (
-	jURL    string
-	filters string
-	fields  string
-	output  string
+	jURL      string
+	filters   string
+	fields    string
+	project   string
+	issueType string
 )
 
 func init() {
@@ -37,11 +37,17 @@ func init() {
 	fl.StringVarP(&jURL, "url", "u", "", "URL to JIRA worskspace")
 	searchCmd.MarkPersistentFlagRequired("url")
 
+	fl.StringVarP(&project, "project", "p", "", "The 'JIRA PROJECT(s)' in which the search has to be done. Give comman separated for multiple projects")
+	searchCmd.MarkPersistentFlagRequired("project")
+
+	fl.StringVarP(&issueType, "issuetype", "i", "", "The issue type which has to be searched, this can be either a single type or comma separated types eg: Story,Bug")
+	searchCmd.MarkPersistentFlagRequired("issueType")
+
+	// Optional Flags
 	fl.StringVarP(&filters, "filters", "f", "", "The filters to be applied for the search. eg: Project Name, Sprint etc. Filters must be 'quoted' and 'comma' separated with name value 'colon' separated. Eg -> 'Project Name:YourProject,Sprint:Sprint1'")
-	searchCmd.MarkPersistentFlagRequired("filters")
 
 	fl.StringVarP(&fields, "fields", "d", "", "The fields to be retrieved for the result set. Fields must be comma separated and quoted")
-	searchCmd.MarkPersistentFlagRequired("fields")
+
 }
 
 var searchCmd = &cobra.Command{
@@ -50,55 +56,44 @@ var searchCmd = &cobra.Command{
 	Example: "ferry search --url yoursite.com --output test.csv --filters 'project name:test project,sprint:sprint 2,issue type:bug' --fields 'assignee,points,scrum team'",
 	Long:    "Search and export issues.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		// TODO : Remove print for debugging
-		fmt.Println(args)
-		fmt.Println(filters, fields)
-
-		c, err := gConfig()
-		if err != nil {
-			return err
-		}
 		creds, err := gCreds()
 		if err != nil {
 			return err
 		}
 
-		c.SetCreds(creds)
-
-		// start Jira Finder instance
-		err, f := jirafinder.NewJiraFinder(c)
+		s, err := searchParam(creds)
 		if err != nil {
 			return err
 		}
-
-		if err := f.Search(); err != nil {
+		if err := search.Search(s, httprequest.NewClient(s.URL, s.AuthToken())); err != nil {
 			return err
 		}
-
 		fmt.Println(" Download complete!!. Results exported to 'output.csv' file ")
 		return nil
 	},
 }
 
-func gConfig() (*config.Config, error) {
+func searchParam(creds search.Creds) (search.SearchParam, error) {
 
 	mFilters, err := parseFilters()
 	if err != nil {
-		return nil, err
+		return search.SearchParam{}, err
 	}
+	//Add project and Issue Type to the filters
+	mFilters = append(mFilters, search.NewField("Project", project), search.NewField("Issue Type", issueType))
+
 	sFields, err := parseFields()
 
 	if err != nil {
-		return nil, err
+		return search.SearchParam{}, err
 	}
 
-	return config.NewConfig(jURL, mFilters, sFields, output), nil
+	return search.NewSearchParam(jURL, project, issueType, mFilters, sFields, creds), nil
 }
 
-func gCreds() (config.Creds, error) {
+func gCreds() (search.Creds, error) {
 
-	return config.Creds{Username: "krishnakayc@gmail.com", Password: "3Cw9WbaBp6UD0bLgk0I23AB7"}, nil
+	return search.Creds{Username: "krishnakayc@gmail.com", Password: "3Cw9WbaBp6UD0bLgk0I23AB7"}, nil
 	/*  var username string
 
 	fmt.Printf("Please enter credentials for the site %v", jURL)
@@ -116,12 +111,17 @@ func gCreds() (config.Creds, error) {
 	*/
 }
 
-func parseFilters() (map[string]interface{}, error) {
-	mFilters := make(map[string]interface{})
+func parseFilters() ([]search.Field, error) {
+	mFilters := make([]search.Field, 0)
+
+	if len(filters) == 0 {
+		return mFilters, nil
+	}
+
 	for _, filter := range strings.Split(filters, ",") {
 		kvp := strings.Split(filter, ":")
 		if len(kvp) == 2 {
-			mFilters[kvp[0]] = kvp[1]
+			mFilters = append(mFilters, search.NewField(kvp[0], kvp[1]))
 		}
 	}
 
@@ -132,10 +132,18 @@ func parseFilters() (map[string]interface{}, error) {
 	return mFilters, nil
 }
 
-func parseFields() ([]string, error) {
-	sFields := make([]string, 0)
+func parseFields() ([]search.Field, error) {
+	sFields := make([]search.Field, 0)
+	if len(fields) == 0 {
+		//If user hasn't specified any field, add summary and assignee as default fields
+		sFields = append(sFields, search.NewField("summary", ""))
+		sFields = append(sFields, search.NewField("assignee", ""))
+
+		return sFields, nil
+	}
+
 	for _, field := range strings.Split(fields, ",") {
-		sFields = append(sFields, field)
+		sFields = append(sFields, search.NewField(field, ""))
 	}
 
 	if len(sFields) == 0 {

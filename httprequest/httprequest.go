@@ -1,6 +1,7 @@
 package httprequest
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -49,6 +50,7 @@ func (httpreq *HTTPRequest) get() *http.Request {
 
 		endPoint.RawQuery = parameters.Encode()
 		finalPath = endPoint.String()
+		fmt.Println(finalPath)
 
 	} else {
 		finalPath = httpreq.URL + httpreq.Path

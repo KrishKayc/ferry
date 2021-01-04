@@ -1,4 +1,4 @@
-module github.com/gojira/ferry
+module github.com/gojira/jira
 
 go 1.14
 
@@ -17,4 +17,5 @@ require (
 	golang.org/x/sys v0.0.0-20201020230747-6e5568b54d1a // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
+	honnef.co/go/tools v0.0.1-2019.2.3
 )
