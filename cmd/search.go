@@ -73,7 +73,7 @@ var searchCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(" Download complete!!. Results exported to 'output.csv' file ")
+		fmt.Println("Download complete!!. Results exported to 'output.csv' file ")
 		return nil
 	},
 }
