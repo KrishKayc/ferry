@@ -27,24 +27,24 @@ Use "jira [command] --help" for more information about a command.
 **Simple Search**
 
 ```
- jira search --project "Your Project" --issuetype Story 
+ ./jira search --project "Your Project" --issuetype Story 
 ```
 
 **Filter multiple 'issue types'**
 
 ```
- jira search --project "Your Project" --issuetype "Story,Bug,SubTask"
+ ./jira search --project "Your Project" --issuetype "Story,Bug,SubTask"
 ```
     
 **Return specified fields**
 ```
- jira search --project "Your Project" --issuetype "Story" --fields "summary,assignee,reporter,sprint" 
+ ./jira search --project "Your Project" --issuetype "Story" --fields "summary,assignee,reporter,sprint" 
 ```
 
 **Apply Filters**
 *The below command will pull all the **Bugs** from **sprint5** assigned to the user **John***
 ```
- jira search --project "Your Project" --issuetype "Bug" --fields "summary,sprint" --filters "sprint:sprint5,assignee:John"
+ ./jira search --project "Your Project" --issuetype "Bug" --fields "summary,sprint" --filters "sprint:sprint5,assignee:John"
 ```
 
 

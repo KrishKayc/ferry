@@ -25,8 +25,7 @@ func debug(data interface{}) {
 }
 
 //Search finds the issue from jira based on the config
-func Search(s SearchParam, client httprequest.Client) error {
-	output := [][]string{getFieldNames(s.Fields)}
+func Search(p Param, client httprequest.Client) error {
 
 	//get all the fields available in the server
 	//this is to get the IDs for custom fields to create the jql query
@@ -36,19 +35,13 @@ func Search(s SearchParam, client httprequest.Client) error {
 		return r.Err
 	}
 
-	setID(s, r.Data)
-	response, err := search(client, s)
+	setID(p, r.Data)
+	response, err := search(client, p)
 	if err != nil {
 		return err
 	}
 
-	for _, i := range response.Data {
-		if f := download(i, getFieldIDs(s.Fields)); f != nil {
-			output = append(output, f)
-		}
-	}
-
-	return export(output)
+	return download(response.Data, p)
 }
 
 func allFields(client httprequest.Client) chan Result {
@@ -68,29 +61,29 @@ func allFields(client httprequest.Client) chan Result {
 	return c
 }
 
-func setID(s SearchParam, fields []map[string]interface{}) {
+func setID(p Param, fields []map[string]interface{}) {
 
 	for _, field := range fields {
-		setFilterID(field, s)
-		setFilterID(field, s)
+		setFilterID(field, p)
+		setFieldID(field, p)
 	}
 }
 
-func setFilterID(field map[string]interface{}, s SearchParam) {
-	for i, v := range s.Filters {
+func setFilterID(field map[string]interface{}, p Param) {
+	for i, v := range p.Filters {
 		if strings.ToLower(field["name"].(string)) == strings.ToLower(v.Name) {
-			id := strings.ToLower(strings.ReplaceAll(strings.ToLower(v.Name), " ", ""))
+			id := strings.ToLower(strings.ReplaceAll(v.Name, " ", ""))
 			if field["custom"].(bool) {
 				id = "cf[" + strings.Replace(field["id"].(string), "customfield_", "", -1) + "]"
 			}
 			v.ID = id
-			s.Filters[i] = v
+			p.Filters[i] = v
 		}
 	}
 }
 
-func setFieldID(field map[string]interface{}, s SearchParam) {
-	for i, v := range s.Fields {
+func setFieldID(field map[string]interface{}, p Param) {
+	for i, v := range p.Fields {
 		if strings.ToLower(field["name"].(string)) == strings.ToLower(v.Name) {
 			id := strings.ToLower(strings.ReplaceAll(v.Name, " ", ""))
 
@@ -98,19 +91,19 @@ func setFieldID(field map[string]interface{}, s SearchParam) {
 				id = fmt.Sprint(field["id"].(string))
 			}
 			v.ID = id
-			s.Filters[i] = v
+			p.Fields[i] = v
 		}
 	}
 }
 
-func search(client httprequest.Client, s SearchParam) (*Result, error) {
+func search(client httprequest.Client, p Param) (*Result, error) {
 	var step int64 = 100
 	var startAt int64 = 0
 	params := make(map[string]string)
-	params["jql"] = getJql(s.Filters)
+	params["jql"] = getJql(p.Filters)
 	params["maxResults"] = strconv.FormatInt(step, 10)
 	params["startAt"] = strconv.FormatInt(startAt, 10)
-	params["fields"] = strings.Join(getFieldIDs(s.Fields), ",")
+	params["fields"] = strings.Join(getFieldIDs(p.Fields), ",")
 
 	result := <-searchP(client, params)
 	if result.Err != nil {
@@ -154,17 +147,4 @@ func searchP(client httprequest.Client, params map[string]string) chan *Result {
 	}()
 
 	return c
-}
-
-func download(issue map[string]interface{}, fields []string) []string {
-	fieldValues := make([]string, 0)
-
-	for _, field := range fields {
-		fieldValues = append(fieldValues, getFieldVal(issue, field))
-	}
-	if len(fieldValues) > 0 {
-		return fieldValues
-	}
-
-	return []string{}
 }

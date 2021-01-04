@@ -10,6 +10,36 @@ import (
 	"strings"
 )
 
+//This specifies which attributes must be displayed to the user in the exported csv.
+//Eg : if field 'assignee' is provided by the user in the --fields flag, display 'displayName' and so..
+//Add (or) modify this map as per the requirement
+var fieldDisplayAttr = map[string]string{
+	"assignee":     "displayName",
+	"reporter":     "displayName",
+	"issuetype":    "name",
+	"status":       "name",
+	"priority":     "name",
+	"timetracking": "originalEstimate",
+}
+
+func download(issues []map[string]interface{}, p Param) error {
+
+	fieldNames, fieldIDs := getFieldNames(p.Fields), getFieldIDs(p.Fields)
+	//Write field names to the header of csv
+	output := [][]string{fieldNames}
+
+	for _, issue := range issues {
+		fieldValues := make([]string, 0)
+
+		for _, field := range fieldIDs {
+			fieldValues = append(fieldValues, getFieldVal(issue, field))
+		}
+		if len(fieldValues) > 0 {
+			output = append(output, fieldValues)
+		}
+	}
+	return export(output)
+}
 func export(results [][]string) error {
 	if len(results) == 0 {
 		fmt.Printf("No issues found to download")
@@ -30,19 +60,18 @@ func export(results [][]string) error {
 }
 
 func getJql(filters []Field) string {
-	index := 0
-	totalCount := len(filters)
+	index, total := 0, len(filters)
 	var b strings.Builder
 	for _, v := range filters {
 		index++
 		if strings.Contains(v.Value, ",") {
-			valSlice := strings.Split(v.Value, ",")
-			b.WriteString(v.ID + " in (" + getInFilterValue(valSlice) + ")")
+			arr := strings.Split(v.Value, ",")
+			b.WriteString(v.ID + " in (" + getInFilterVal(arr) + ")")
 		} else {
 			b.WriteString(v.ID + "=" + "'" + v.Value + "'")
 		}
 
-		if index != totalCount {
+		if index != total {
 			b.WriteString(" AND ")
 		}
 
@@ -51,14 +80,13 @@ func getJql(filters []Field) string {
 	return b.String()
 }
 
-func getInFilterValue(values []string) string {
-	index := 0
-	totalCount := len(values)
+func getInFilterVal(values []string) string {
+	index, total := 0, len(values)
 	var b strings.Builder
 	for _, val := range values {
 		index++
 		b.WriteString("'" + strings.TrimSpace(val) + "'")
-		if index != totalCount {
+		if index != total {
 			b.WriteString(",")
 		}
 	}
@@ -78,39 +106,41 @@ func getFieldVal(issue map[string]interface{}, field string) string {
 
 // getStrVal gets the string value based on the type of interface
 func getStrVal(field interface{}, fieldName string) string {
-	result := "N/A"
-
-	//See if the field is a plain string field or a struct by itself, if it is a struct we need to display one of it's attributes eg: name,displayName etc
+	//If the issue does not have the required field, return as N/A.
+	if field == nil {
+		return "N/A"
+	}
+	//The field type can be anything. It can be a map or array or plain string.
+	//If it is a map, we need to display one of it's attributes eg: name,displayName etc
 	val, ok := field.(map[string]interface{})
 	if ok {
-		tmp, ok := val[getAttr(fieldName)]
-		if ok {
-			result = tmp.(string)
-		}
-	} else if val != nil {
-		result = fmt.Sprint(val)
+		return getAttrFromMap(val, fieldName)
+	}
+	//If it is an array, take the first element which is a map, this happens to custom field eg : Sprint
+	arr, ok := field.([]interface{})
+	if ok {
+		return getAttrFromMap(arr[0].(map[string]interface{}), fieldName)
 	}
 
-	return result
+	//This is for plain string fields
+	return field.(string)
+}
+func getAttrFromMap(field map[string]interface{}, fieldName string) string {
+	tmp, ok := field[getAttr(fieldName)]
+	if ok {
+		return tmp.(string)
+	}
+	return "N/A"
 }
 
 // getAttr gets the attribute of the field, eg name, displayName etc.
 func getAttr(fieldName string) string {
-
-	if strings.ToLower(fieldName) == "assignee" || strings.ToLower(fieldName) == "reporter" {
-		return "displayName"
-	}
-
-	if strings.ToLower(fieldName) == "sprint" || strings.ToLower(fieldName) == "issuetype" || strings.ToLower(fieldName) == "status" || strings.ToLower(fieldName) == "priority" {
-		return "name"
-	}
-
-	if strings.ToLower(fieldName) == "timetracking" {
-		return "originalEstimate"
-	}
-
 	if strings.Contains(fieldName, "customfield_") {
 		return "name"
+	}
+
+	if val, ok := fieldDisplayAttr[fieldName]; ok {
+		return val
 	}
 
 	return "value"
@@ -121,7 +151,6 @@ func getFieldNames(fields []Field) []string {
 	for _, f := range fields {
 		names = append(names, f.Name)
 	}
-
 	return names
 }
 
@@ -130,14 +159,5 @@ func getFieldIDs(fields []Field) []string {
 	for _, f := range fields {
 		IDs = append(IDs, f.ID)
 	}
-
 	return IDs
-
-}
-
-//HandleError handles errors
-func HandleError(err error) {
-	if err != nil {
-		panic(err.Error())
-	}
 }
