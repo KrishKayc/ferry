@@ -69,7 +69,12 @@ var searchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := search.Search(p, httprequest.NewClient(p.URL, p.AuthToken())); err != nil {
+		r := search.Search(p, httprequest.NewClient(p.URL, p.AuthToken()))
+		if r.Err != nil {
+			return r.Err
+		}
+
+		if err := writer.Write(r, p); err != nil {
 			return err
 		}
 

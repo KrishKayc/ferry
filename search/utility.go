@@ -22,24 +22,6 @@ var fieldDisplayAttr = map[string]string{
 	"timetracking": "originalEstimate",
 }
 
-func download(issues []map[string]interface{}, p Param) error {
-
-	fieldNames, fieldIDs := getFieldNames(p.Fields), getFieldIDs(p.Fields)
-	//Write field names to the header of csv
-	output := [][]string{fieldNames}
-
-	for _, issue := range issues {
-		fieldValues := make([]string, 0)
-
-		for _, field := range fieldIDs {
-			fieldValues = append(fieldValues, getFieldVal(issue, field))
-		}
-		if len(fieldValues) > 0 {
-			output = append(output, fieldValues)
-		}
-	}
-	return export(output)
-}
 func export(results [][]string) error {
 	if len(results) == 0 {
 		fmt.Printf("No issues found to download")

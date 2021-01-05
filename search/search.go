@@ -25,23 +25,19 @@ func debug(data interface{}) {
 }
 
 //Search finds the issue from jira based on the config
-func Search(p Param, client httprequest.Client) error {
+func Search(p Param, client httprequest.Client) Result {
 
 	//get all the fields available in the server
 	//this is to get the IDs for custom fields to create the jql query
 	r := <-allFields(client)
 
 	if r.Err != nil {
-		return r.Err
+		return r
 	}
 
 	setID(p, r.Data)
-	response, err := search(client, p)
-	if err != nil {
-		return err
-	}
+	return search(client, p)
 
-	return download(response.Data, p)
 }
 
 func allFields(client httprequest.Client) chan Result {
@@ -96,7 +92,7 @@ func setFieldID(field map[string]interface{}, p Param) {
 	}
 }
 
-func search(client httprequest.Client, p Param) (*Result, error) {
+func search(client httprequest.Client, p Param) Result {
 	var step int64 = 100
 	var startAt int64 = 0
 	params := make(map[string]string)
@@ -107,7 +103,7 @@ func search(client httprequest.Client, p Param) (*Result, error) {
 
 	result := <-searchP(client, params)
 	if result.Err != nil {
-		return nil, result.Err
+		return result
 	}
 
 	// handle results over the limit of 100
@@ -121,25 +117,25 @@ func search(client httprequest.Client, p Param) (*Result, error) {
 
 		r := <-searchP(client, params)
 		if r.Err != nil {
-			return nil, r.Err
+			return r
 		}
 
 		result.Data = append(result.Data, r.Data...)
 	}
 
-	return result, nil
+	return result
 }
 
-func searchP(client httprequest.Client, params map[string]string) chan *Result {
-	c := make(chan *Result)
+func searchP(client httprequest.Client, params map[string]string) chan Result {
+	c := make(chan Result)
 
 	go func() {
-		result := new(Result)
+		result := Result{}
 
 		body := client.Get("/rest/api/2/search", params)
 
 		if err := json.Unmarshal(body, &result); err != nil {
-			c <- &Result{Err: err}
+			c <- Result{Err: err}
 			return
 		}
 		c <- result

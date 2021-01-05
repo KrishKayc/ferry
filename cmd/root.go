@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/gojira/jira/search"
 	"github.com/spf13/cobra"
 )
 
-var (
-	Version = "0.0.1"
-)
-
+var writer search.Writer
 var rootCmd = &cobra.Command{
 	Use:   "jira",
 	Short: "JIRA searcher. Fetches stories/bugs from your JIRA",
@@ -20,7 +18,9 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func Execute() {
+//Execute runs the root command
+func Execute(w search.Writer) {
+	writer = w
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err.Error())
 		log.Fatal(err)
