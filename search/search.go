@@ -16,8 +16,14 @@ type Result struct {
 	MaxResults int                      `json:"maxResults"`
 	Total      int                      `json:"total"`
 	Data       []map[string]interface{} `json:"issues"`
-	Err        error
 }
+
+var client httprequest.Client
+
+const (
+	start int = 0
+	step  int = 1
+)
 
 func debug(data interface{}) {
 	file, _ := json.Marshal(data)
@@ -25,122 +31,80 @@ func debug(data interface{}) {
 }
 
 //Search finds the issue from jira based on the config
-func Search(p Param, client httprequest.Client) Result {
-
-	//get all the fields available in the server
-	//this is to get the IDs for custom fields to create the jql query
-	r := <-allFields(client)
-
-	if r.Err != nil {
-		return r
+func Search(p Param, c httprequest.Client) (Result, error) {
+	client = c
+	//get all the fields available in the server to set the IDs for custom fields to create the jql query
+	r, err := fields()
+	if err != nil {
+		return r, err
+	}
+	for _, field := range r.Data {
+		setID(p.Filters, field, true)
+		setID(p.Fields, field, false)
 	}
 
-	setID(p, r.Data)
-	return search(client, p)
-
+	return search(getParams(p), make([]map[string]interface{}, 0), start, step)
 }
 
-func allFields(client httprequest.Client) chan Result {
-
-	c := make(chan Result)
-	go func() {
-		body := client.Get("/rest/api/2/field", nil)
-
-		var fields []map[string]interface{}
-		err := json.Unmarshal(body, &fields)
-		if err != nil {
-			c <- Result{Err: err}
-			return
-		}
-		c <- Result{Data: fields}
-	}()
-	return c
-}
-
-func setID(p Param, fields []map[string]interface{}) {
-
-	for _, field := range fields {
-		setFilterID(field, p)
-		setFieldID(field, p)
-	}
-}
-
-func setFilterID(field map[string]interface{}, p Param) {
-	for i, v := range p.Filters {
+func setID(fields []Field, field map[string]interface{}, isFilter bool) {
+	for i, v := range fields {
 		if strings.ToLower(field["name"].(string)) == strings.ToLower(v.Name) {
 			id := strings.ToLower(strings.ReplaceAll(v.Name, " ", ""))
 			if field["custom"].(bool) {
-				id = "cf[" + strings.Replace(field["id"].(string), "customfield_", "", -1) + "]"
+				//For filters, in jql we need to give in the format cf[100203] and for fields to retrieve we need to provide the exact id
+				if isFilter {
+					id = "cf[" + strings.Replace(field["id"].(string), "customfield_", "", -1) + "]"
+				} else {
+					id = fmt.Sprint(field["id"].(string))
+				}
 			}
 			v.ID = id
-			p.Filters[i] = v
+			fields[i] = v
 		}
 	}
 }
 
-func setFieldID(field map[string]interface{}, p Param) {
-	for i, v := range p.Fields {
-		if strings.ToLower(field["name"].(string)) == strings.ToLower(v.Name) {
-			id := strings.ToLower(strings.ReplaceAll(v.Name, " ", ""))
-
-			if field["custom"].(bool) {
-				id = fmt.Sprint(field["id"].(string))
-			}
-			v.ID = id
-			p.Fields[i] = v
-		}
-	}
-}
-
-func search(client httprequest.Client, p Param) Result {
-	var step int64 = 100
-	var startAt int64 = 0
+func getParams(p Param) map[string]string {
 	params := make(map[string]string)
 	params["jql"] = getJql(p.Filters)
-	params["maxResults"] = strconv.FormatInt(step, 10)
-	params["startAt"] = strconv.FormatInt(startAt, 10)
 	params["fields"] = strings.Join(getFieldIDs(p.Fields), ",")
+	return params
 
-	result := <-searchP(client, params)
-	if result.Err != nil {
-		return result
-	}
-
-	// handle results over the limit of 100
-	for {
-		if result.Total <= len(result.Data) {
-			break
-		}
-
-		startAt += step
-		params["startAt"] = strconv.FormatInt(startAt, 10)
-
-		r := <-searchP(client, params)
-		if r.Err != nil {
-			return r
-		}
-
-		result.Data = append(result.Data, r.Data...)
-	}
-
-	return result
 }
 
-func searchP(client httprequest.Client, params map[string]string) chan Result {
-	c := make(chan Result)
+func search(params map[string]string, data []map[string]interface{}, start int, step int) (Result, error) {
+	params["startAt"], params["maxResults"] = strconv.Itoa(start), strconv.Itoa(step)
+	result, err := searchP(params)
+	if err != nil {
+		return result, err
+	}
+	result.Data = append(result.Data, data...)
+	if result.Total <= len(result.Data) {
+		return result, nil
+	}
 
-	go func() {
-		result := Result{}
+	return search(params, result.Data, start+step, step)
 
-		body := client.Get("/rest/api/2/search", params)
+}
 
-		if err := json.Unmarshal(body, &result); err != nil {
-			c <- Result{Err: err}
-			return
-		}
-		c <- result
+func fields() (Result, error) {
+	body := client.Get("/rest/api/2/field", nil)
 
-	}()
+	var fields []map[string]interface{}
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return Result{}, err
+	}
+	return Result{Data: fields}, nil
 
-	return c
+}
+
+func searchP(params map[string]string) (Result, error) {
+	result := Result{}
+
+	body := client.Get("/rest/api/2/search", params)
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return result, err
+	}
+	return result, nil
 }

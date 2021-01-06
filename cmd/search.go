@@ -60,20 +60,25 @@ var searchCmd = &cobra.Command{
 	Example: "jira search --url yoursite.com  --filters \"project:test project,sprint:sprint 2,issue type:bug\" --fields \"assignee,points,scrum team\"",
 	Long:    "Search and export issues.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		//get credentials from the user
 		creds, err := gCreds()
 		if err != nil {
 			return err
 		}
 
+		//construct the search parameter
 		p, err := searchParam(creds)
 		if err != nil {
 			return err
 		}
-		r := search.Search(p, httprequest.NewClient(p.URL, p.AuthToken()))
-		if r.Err != nil {
-			return r.Err
+
+		//do the search
+		r, err := search.Search(p, httprequest.NewClient(p.URL, p.AuthToken()))
+		if err != nil {
+			return err
 		}
 
+		//write to the configured writer
 		if err := writer.Write(r, p); err != nil {
 			return err
 		}
@@ -103,7 +108,7 @@ func searchParam(creds search.Creds) (search.Param, error) {
 
 func gCreds() (search.Creds, error) {
 
-	//	return search.Creds{Username: "krishnakayc@gmail.com", Password: "3Cw9WbaBp6UD0bLgk0I23AB7"}, nil
+	//return search.Creds{Username: "krishnakayc@gmail.com", Password: "3Cw9WbaBp6UD0bLgk0I23AB7"}, nil
 	var username string
 
 	fmt.Printf("Please enter credentials for the site '%v'", jURL)

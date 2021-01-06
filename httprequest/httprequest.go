@@ -49,7 +49,6 @@ func (httpreq *HTTPRequest) get() *http.Request {
 
 		endPoint.RawQuery = parameters.Encode()
 		finalPath = endPoint.String()
-
 	} else {
 		finalPath = httpreq.URL + httpreq.Path
 	}
